@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Attendance App</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css'])
     {{-- <script src="https://cdn.tailwindcss.com"></script> --}}
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
     <style>

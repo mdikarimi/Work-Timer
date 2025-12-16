@@ -48,6 +48,6 @@ class User extends Authenticatable
 
     public function workers()
     {
-        return $this->belongsTo(Worker::class);
+        return $this->hasMany(Worker::class);
     }
 }
