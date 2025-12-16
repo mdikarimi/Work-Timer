@@ -4,14 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Models\Worker;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class WorkerController extends Controller
 {
     // نمایش صفحه ادمین با لیست نیروها
-    public function viewAdmin()
+    public function viewAdmin(): Response
     {
-        $workers = auth()->user()->workers;
-        return view('admin', compact('workers'));
+        $workers = auth()->user()->workers()->latest()->get();
+
+        return Inertia::render('Admin/Index', [
+            'workers' => $workers,
+        ]);
     }
 
     // اضافه کردن نیرو

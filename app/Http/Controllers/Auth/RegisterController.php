@@ -7,13 +7,15 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class RegisterController extends Controller
 {
     // نمایش فرم ثبت‌نام
-    public function showRegistrationForm()
+    public function showRegistrationForm(): Response
     {
-        return view('auth.register');
+        return Inertia::render('Auth/Register');
     }
 
     // پردازش ثبت‌نام
