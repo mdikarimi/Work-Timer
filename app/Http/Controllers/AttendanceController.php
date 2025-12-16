@@ -3,16 +3,59 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attendance;
-use App\Models\Worker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class AttendanceController extends Controller
 {
-    public function viewAttendance()
+    public function viewAttendance(): Response
     {
-        $workers = auth()->user()->workers;
-        return view('attendance', compact('workers'));
+        $today = now()->toDateString();
+
+        $workers = auth()->user()
+            ->workers()
+            ->with(['attendances' => function ($query) use ($today) {
+                $query->where('date', $today);
+            }])
+            ->get()
+            ->map(function ($worker) {
+                $attendance = $worker->attendances->first();
+
+                $status = 'absent';
+                if ($attendance?->check_in && $attendance?->check_out) {
+                    $status = 'complete';
+                } elseif ($attendance?->check_in) {
+                    $status = 'working';
+                }
+
+                return [
+                    'id' => $worker->id,
+                    'name' => $worker->name,
+                    'code' => $worker->code,
+                    'attendance' => [
+                        'check_in' => $attendance?->check_in,
+                        'check_out' => $attendance?->check_out,
+                        'status' => $status,
+                    ],
+                ];
+            });
+
+        $present = $workers->filter(fn ($worker) => $worker['attendance']['status'] === 'complete')->count();
+        $working = $workers->filter(fn ($worker) => $worker['attendance']['status'] === 'working')->count();
+        $total = $workers->count();
+
+        return Inertia::render('Attendance/Index', [
+            'today' => $today,
+            'workers' => $workers->values(),
+            'stats' => [
+                'total' => $total,
+                'present' => $present,
+                'working' => $working,
+                'absent' => $total - ($present + $working),
+            ],
+        ]);
     }
 
     public function checkin(Request $request)
@@ -76,92 +119,104 @@ class AttendanceController extends Controller
             ->get();
     }
 
-    public function list(Request $request)
+    public function list(Request $request): Response
     {
-        // دریافت تاریخ از درخواست یا استفاده از تاریخ امروز
         $date = $request->get('date', now()->toDateString());
+        $workerIds = auth()->user()->workers()->pluck('id');
 
-        // دریافت لیست حضور و غیاب بر اساس تاریخ و کارمندان کاربر
         $attendances = Attendance::with('worker')
-            ->whereIn('worker_id', auth()->user()->workers()->pluck('id'))
+            ->whereIn('worker_id', $workerIds)
             ->where('date', $date)
             ->orderBy('check_in', 'asc')
-            ->get();
+            ->get()
+            ->map(function ($attendance) use ($date) {
+                $checkIn = $attendance->check_in ? Carbon::parse($attendance->check_in) : null;
+                $checkOut = $attendance->check_out ? Carbon::parse($attendance->check_out) : null;
 
-        // محاسبه ساعات کار و تاخیر
-        $attendances->each(function ($attendance) use ($date) {
-            if ($attendance->check_in && $attendance->check_out) {
-                $checkIn = \Carbon\Carbon::parse($attendance->check_in);
-                $checkOut = \Carbon\Carbon::parse($attendance->check_out);
+                $workHours = '-';
+                $totalMinutes = 0;
+                $isLate = false;
+                $lateMinutes = 0;
 
-                // محاسبه ساعت کار
-                $hours = $checkIn->diffInHours($checkOut);
-                $minutes = $checkIn->diffInMinutes($checkOut) % 60;
-                $attendance->work_hours = sprintf('%02d:%02d', $hours, $minutes);
-                $attendance->total_minutes = $checkOut->diffInMinutes($checkIn);
+                if ($checkIn && $checkOut) {
+                    $hours = $checkIn->diffInHours($checkOut);
+                    $minutes = $checkIn->diffInMinutes($checkOut) % 60;
+                    $workHours = sprintf('%02d:%02d', $hours, $minutes);
+                    $totalMinutes = $checkOut->diffInMinutes($checkIn);
 
-                // محاسبه تاخیر (اگر بعد از ساعت 9 وارد شده باشد)
-                $expectedStart = \Carbon\Carbon::parse('09:00');
-                if ($checkIn->greaterThan($expectedStart)) {
-                    $attendance->is_late = true;
-                    $attendance->late_minutes = $checkIn->diffInMinutes($expectedStart);
-                } else {
-                    $attendance->is_late = false;
-                    $attendance->late_minutes = 0;
+                    $expectedStart = Carbon::parse('09:00');
+                    if ($checkIn->greaterThan($expectedStart)) {
+                        $isLate = true;
+                        $lateMinutes = $checkIn->diffInMinutes($expectedStart);
+                    }
                 }
-            } else {
-                $attendance->work_hours = '-';
-                $attendance->total_minutes = 0;
-                $attendance->is_late = false;
-                $attendance->late_minutes = 0;
-            }
 
-            // محاسبه ساعات کاری هفتگی
-            $startOfWeek = Carbon::parse($date)->startOfWeek();
-            $endOfWeek = Carbon::parse($date)->endOfWeek();
+                $weeklyMinutes = $this->calculateRangeMinutes(
+                    $attendance->worker_id,
+                    Carbon::parse($date)->startOfWeek(),
+                    Carbon::parse($date)->endOfWeek()
+                );
 
-            $weeklyAttendances = Attendance::where('worker_id', $attendance->worker_id)
-                ->whereBetween('date', [$startOfWeek->toDateString(), $endOfWeek->toDateString()])
-                ->whereNotNull('check_in')
-                ->whereNotNull('check_out')
-                ->get();
+                $monthlyMinutes = $this->calculateRangeMinutes(
+                    $attendance->worker_id,
+                    Carbon::parse($date)->startOfMonth(),
+                    Carbon::parse($date)->endOfMonth()
+                );
 
-            $weeklyMinutes = 0;
-            foreach ($weeklyAttendances as $weekly) {
-                if ($weekly->check_in && $weekly->check_out) {
-                    $weeklyMinutes += Carbon::parse($weekly->check_in)->diffInMinutes(Carbon::parse($weekly->check_out));
+                $status = 'absent';
+                if ($attendance->check_in && $attendance->check_out) {
+                    $status = 'present';
+                } elseif ($attendance->check_in) {
+                    $status = 'working';
                 }
-            }
 
-            $attendance->weekly_hours = floor($weeklyMinutes / 60) . ':' . sprintf('%02d', $weeklyMinutes % 60);
-            $attendance->weekly_minutes = $weeklyMinutes;
+                return [
+                    'id' => $attendance->id,
+                    'worker' => [
+                        'id' => $attendance->worker?->id,
+                        'name' => $attendance->worker?->name,
+                        'code' => $attendance->worker?->code,
+                    ],
+                    'date' => $attendance->date,
+                    'check_in' => $attendance->check_in,
+                    'check_out' => $attendance->check_out,
+                    'work_hours' => $workHours,
+                    'weekly_hours' => floor($weeklyMinutes / 60) . ':' . sprintf('%02d', $weeklyMinutes % 60),
+                    'monthly_hours' => floor($monthlyMinutes / 60) . ':' . sprintf('%02d', $monthlyMinutes % 60),
+                    'weekly_minutes' => $weeklyMinutes,
+                    'monthly_minutes' => $monthlyMinutes,
+                    'total_minutes' => $totalMinutes,
+                    'is_late' => $isLate,
+                    'late_minutes' => $lateMinutes,
+                    'status' => $status,
+                ];
+            });
 
-            // محاسبه ساعات کاری ماهانه
-            $startOfMonth = Carbon::parse($date)->startOfMonth();
-            $endOfMonth = Carbon::parse($date)->endOfMonth();
-
-            $monthlyAttendances = Attendance::where('worker_id', $attendance->worker_id)
-                ->whereBetween('date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
-                ->whereNotNull('check_in')
-                ->whereNotNull('check_out')
-                ->get();
-
-            $monthlyMinutes = 0;
-            foreach ($monthlyAttendances as $monthly) {
-                if ($monthly->check_in && $monthly->check_out) {
-                    $monthlyMinutes += Carbon::parse($monthly->check_in)->diffInMinutes(Carbon::parse($monthly->check_out));
-                }
-            }
-
-            $attendance->monthly_hours = floor($monthlyMinutes / 60) . ':' . sprintf('%02d', $monthlyMinutes % 60);
-            $attendance->monthly_minutes = $monthlyMinutes;
-        });
-
-        // آمار
-        $totalWorkers = auth()->user()->workers()->count();
-        $presentWorkers = $attendances->whereNotNull('check_in')->count();
+        $totalWorkers = $workerIds->count();
+        $presentWorkers = $attendances->filter(fn ($attendance) => $attendance['status'] !== 'absent')->count();
         $absentWorkers = $totalWorkers - $presentWorkers;
 
-        return view('attendance-list', compact('attendances', 'date', 'totalWorkers', 'presentWorkers', 'absentWorkers'));
+        return Inertia::render('Attendance/List', [
+            'date' => $date,
+            'attendances' => $attendances->values(),
+            'totals' => [
+                'total' => $totalWorkers,
+                'present' => $presentWorkers,
+                'absent' => $absentWorkers,
+            ],
+        ]);
+    }
+
+    private function calculateRangeMinutes(int $workerId, Carbon $start, Carbon $end): int
+    {
+        return Attendance::where('worker_id', $workerId)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->whereNotNull('check_in')
+            ->whereNotNull('check_out')
+            ->get()
+            ->reduce(function ($carry, $attendance) {
+                return $carry + Carbon::parse($attendance->check_in)
+                    ->diffInMinutes(Carbon::parse($attendance->check_out));
+            }, 0);
     }
 }
