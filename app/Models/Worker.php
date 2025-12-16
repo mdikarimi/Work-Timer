@@ -8,10 +8,16 @@ class Worker extends Model
 {
     protected $fillable = [
         'name',
+        'user_id',
     ];
     
     public function attendances()
     {
         return $this->hasMany(Attendance::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

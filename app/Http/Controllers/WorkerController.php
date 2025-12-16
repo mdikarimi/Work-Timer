@@ -10,7 +10,7 @@ class WorkerController extends Controller
     // نمایش صفحه ادمین با لیست نیروها
     public function viewAdmin()
     {
-        $workers = Worker::all();
+        $workers = auth()->user()->workers;
         return view('admin', compact('workers'));
     }
 
@@ -21,7 +21,7 @@ class WorkerController extends Controller
             'name' => 'required|string'
         ]);
 
-        Worker::create([
+        auth()->user()->workers()->create([
             'name' => $request->name
         ]);
 
@@ -31,7 +31,8 @@ class WorkerController extends Controller
     // حذف نیرو
     public function destroy($id)
     {
-        Worker::findOrFail($id)->delete();
+        $worker = auth()->user()->workers()->findOrFail($id);
+        $worker->delete();
         return redirect()->back()->with('message', 'نیرو حذف شد');
     }
 }

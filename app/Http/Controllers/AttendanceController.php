@@ -11,7 +11,7 @@ class AttendanceController extends Controller
 {
     public function viewAttendance()
     {
-        $workers = Worker::all();
+        $workers = auth()->user()->workers;
         return view('attendance', compact('workers'));
     }
 
@@ -21,11 +21,13 @@ class AttendanceController extends Controller
             'worker_id' => 'required|exists:workers,id'
         ]);
 
-        $worker_id = $request->worker_id;
+        // Ensure worker belongs to authenticated user
+        $worker = auth()->user()->workers()->findOrFail($request->worker_id);
+
         $today = now()->toDateString();
 
         $attendance = Attendance::firstOrCreate(
-            ['worker_id' => $worker_id, 'date' => $today]
+            ['worker_id' => $worker->id, 'date' => $today]
         );
 
         if ($attendance->check_in) {
@@ -42,10 +44,12 @@ class AttendanceController extends Controller
             'worker_id' => 'required|exists:workers,id'
         ]);
 
-        $worker_id = $request->worker_id;
+        // Ensure worker belongs to authenticated user
+        $worker = auth()->user()->workers()->findOrFail($request->worker_id);
+
         $today = now()->toDateString();
 
-        $attendance = Attendance::where('worker_id', $worker_id)
+        $attendance = Attendance::where('worker_id', $worker->id)
             ->where('date', $today)
             ->first();
 
@@ -77,8 +81,9 @@ class AttendanceController extends Controller
         // دریافت تاریخ از درخواست یا استفاده از تاریخ امروز
         $date = $request->get('date', now()->toDateString());
 
-        // دریافت لیست حضور و غیاب بر اساس تاریخ
+        // دریافت لیست حضور و غیاب بر اساس تاریخ و کارمندان کاربر
         $attendances = Attendance::with('worker')
+            ->whereIn('worker_id', auth()->user()->workers()->pluck('id'))
             ->where('date', $date)
             ->orderBy('check_in', 'asc')
             ->get();
@@ -153,7 +158,7 @@ class AttendanceController extends Controller
         });
 
         // آمار
-        $totalWorkers = Worker::count();
+        $totalWorkers = auth()->user()->workers()->count();
         $presentWorkers = $attendances->whereNotNull('check_in')->count();
         $absentWorkers = $totalWorkers - $presentWorkers;
 
