@@ -16,6 +16,11 @@ class Worker extends Model
         return $this->hasMany(Attendance::class);
     }
 
+    public function finances()
+    {
+        return $this->hasMany(Finance::class);
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

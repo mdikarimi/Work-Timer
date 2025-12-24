@@ -17,33 +17,48 @@ class AttendanceController extends Controller
         $workers = auth()->user()
             ->workers()
             ->with(['attendances' => function ($query) use ($today) {
-                $query->where('date', $today);
+                $query->where('date', $today)
+                    ->orderBy('created_at', 'desc');
             }])
             ->get()
             ->map(function ($worker) {
-                $attendance = $worker->attendances->first();
+                $latestAttendance = $worker->attendances->first();
 
+                // وضعیت بر اساس آخرین رکورد
                 $status = 'absent';
-                if ($attendance?->check_in && $attendance?->check_out) {
-                    $status = 'complete';
-                } elseif ($attendance?->check_in) {
-                    $status = 'working';
+                if ($latestAttendance) {
+                    if ($latestAttendance->check_out) {
+                        // اگر آخرین رکورد خروج داشته باشد، یعنی کامل شده
+                        $status = 'complete';
+                    } else {
+                        // اگر فقط ورود داشته باشد، یعنی در حال کار است
+                        $status = 'working';
+                    }
                 }
+
+                // همه ورود و خروج‌های امروز
+                $attendancesToday = $worker->attendances->map(function ($att) {
+                    return [
+                        'check_in' => $att->check_in,
+                        'check_out' => $att->check_out,
+                    ];
+                });
 
                 return [
                     'id' => $worker->id,
                     'name' => $worker->name,
                     'code' => $worker->code,
-                    'attendance' => [
-                        'check_in' => $attendance?->check_in,
-                        'check_out' => $attendance?->check_out,
+                    'attendances' => $attendancesToday,
+                    'attendance' => [ // برای سازگاری با کد قبلی
+                        'check_in' => $latestAttendance?->check_in,
+                        'check_out' => $latestAttendance?->check_out,
                         'status' => $status,
                     ],
                 ];
             });
 
-        $present = $workers->filter(fn ($worker) => $worker['attendance']['status'] === 'complete')->count();
-        $working = $workers->filter(fn ($worker) => $worker['attendance']['status'] === 'working')->count();
+        $present = $workers->filter(fn($worker) => $worker['attendance']['status'] === 'complete')->count();
+        $working = $workers->filter(fn($worker) => $worker['attendance']['status'] === 'working')->count();
         $total = $workers->count();
 
         return Inertia::render('Attendance/Index', [
@@ -58,6 +73,28 @@ class AttendanceController extends Controller
         ]);
     }
 
+    public function autoCheckoutDaily()
+    {
+        $today = now()->toDateString();
+
+        // پیدا کردن تمام حضور و غیاب‌های امروز که خروج ندارند
+        $incompleteAttendances = Attendance::where('date', $today)
+            ->whereNotNull('check_in')
+            ->whereNull('check_out')
+            ->get();
+
+        foreach ($incompleteAttendances as $attendance) {
+            $attendance->update([
+                'check_out' => $today . ' 23:00:00'
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Auto checkout completed for ' . $incompleteAttendances->count() . ' workers',
+            'count' => $incompleteAttendances->count()
+        ]);
+    }
+
     public function checkin(Request $request)
     {
         $request->validate([
@@ -68,16 +105,27 @@ class AttendanceController extends Controller
         $worker = auth()->user()->workers()->findOrFail($request->worker_id);
 
         $today = now()->toDateString();
+        $now = now();
 
-        $attendance = Attendance::firstOrCreate(
-            ['worker_id' => $worker->id, 'date' => $today]
-        );
+        // بررسی آخرین رکورد امروز
+        $lastAttendance = Attendance::where('worker_id', $worker->id)
+            ->where('date', $today)
+            ->orderBy('created_at', 'desc')
+            ->first();
 
-        if ($attendance->check_in) {
-            return redirect()->back()->with('message', 'امروز قبلا ورود ثبت شده');
+        // اگر آخرین رکورد بدون خروج باشد، نمی‌توان ورود جدید ثبت کرد
+        if ($lastAttendance && !$lastAttendance->check_out) {
+            return redirect()->back()->with('message', 'ابتدا باید خروج قبلی را ثبت کنید');
         }
 
-        $attendance->update(['check_in' => now()]);
+        // ایجاد رکورد جدید برای ورود
+        $attendance = Attendance::create([
+            'worker_id' => $worker->id,
+            'date' => $today,
+            'check_in' => $now,
+            'check_out' => null,
+        ]);
+
         return redirect()->back()->with('message', 'ورود ثبت شد');
     }
 
@@ -92,20 +140,15 @@ class AttendanceController extends Controller
 
         $today = now()->toDateString();
 
+        // پیدا کردن آخرین رکورد بدون خروج برای امروز
         $attendance = Attendance::where('worker_id', $worker->id)
             ->where('date', $today)
+            ->whereNull('check_out')
+            ->orderBy('created_at', 'desc')
             ->first();
 
         if (!$attendance) {
-            return redirect()->back()->with('message', 'اول باید ورود بزنید');
-        }
-
-        if (!$attendance->check_in) {
-            return redirect()->back()->with('message', 'اول باید ورود بزنید');
-        }
-
-        if ($attendance->check_out) {
-            return redirect()->back()->with('message', 'قبلا خروج ثبت شده');
+            return redirect()->back()->with('message', 'ابتدا باید ورود بزنید');
         }
 
         $attendance->update(['check_out' => now()]);
@@ -193,7 +236,7 @@ class AttendanceController extends Controller
             });
 
         $totalWorkers = $workerIds->count();
-        $presentWorkers = $attendances->filter(fn ($attendance) => $attendance['status'] !== 'absent')->count();
+        $presentWorkers = $attendances->filter(fn($attendance) => $attendance['status'] !== 'absent')->count();
         $absentWorkers = $totalWorkers - $presentWorkers;
 
         return Inertia::render('Attendance/List', [
