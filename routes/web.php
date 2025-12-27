@@ -23,6 +23,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/attendance-list', [AttendanceController::class, 'list'])->name('attendance.list');
 
     Route::get('/admin', [WorkerController::class, 'viewAdmin'])->name('admin.view');
+    Route::get('/workers/{worker}/report', [WorkerController::class, 'show'])->name('workers.report');
     Route::post('/workers', [WorkerController::class, 'store'])->name('workers.store');
     Route::delete('/workers/{id}', [WorkerController::class, 'destroy'])->name('workers.destroy');
 

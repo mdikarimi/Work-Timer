@@ -107,7 +107,7 @@ export default function AttendanceIndex({ today, workers, stats }: PageProps) {
                         </h1>
                         <a
                             href="/finance"
-                            className="inline-flex items-center rounded-lg bg-gray-300 px-6 py-3 text-gray-900 shadow-md transition hover:bg-gray-200"
+                            className="inline-flex items-center font-bold rounded-lg bg-purple-300 px-6 py-3 text-purple-900 shadow-md transition hover:bg-purple-200"
                         >
                             امور مالی
                         </a>

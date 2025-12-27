@@ -33,6 +33,21 @@ class WorkerController extends Controller
         return redirect()->back()->with('message', 'نیرو اضافه شد');
     }
 
+    public function show(Worker $worker)
+    {
+        // اطمینان از اینکه ادمین فقط به نیروهای خودش دسترسی دارد
+        if ($worker->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        return Inertia::render('Admin/WorkerReport', [
+            'worker' => $worker,
+            'attendance' => $worker->attendances()->latest()->paginate(10),
+            'finances' => $worker->finances()->latest()->paginate(10),
+            'total_paid' => $worker->finances()->sum('price'),
+        ]);
+    }
+
     // حذف نیرو
     public function destroy($id)
     {
@@ -41,4 +56,3 @@ class WorkerController extends Controller
         return redirect()->back()->with('message', 'نیرو حذف شد');
     }
 }
-

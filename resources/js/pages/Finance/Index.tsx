@@ -78,7 +78,7 @@ export default function FinanceIndex({ workers }) {
                         </h1>
                         <a
                             href="/"
-                            className="inline-flex items-center rounded-lg bg-gray-300 px-6 py-3 text-gray-900 shadow-md transition hover:bg-gray-200"
+                            className="inline-flex items-center font-bold rounded-lg bg-blue-300 px-6 py-3 text-blue-900 shadow-md transition hover:bg-blue-200"
                         >
                             ورود و خروج
                         </a>
