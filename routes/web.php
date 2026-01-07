@@ -25,6 +25,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin', [WorkerController::class, 'viewAdmin'])->name('admin.view');
     Route::get('/workers/{worker}/report', [WorkerController::class, 'show'])->name('workers.report');
     Route::post('/workers', [WorkerController::class, 'store'])->name('workers.store');
+    Route::put('/workers/{id}', [WorkerController::class, 'update'])->name('workers.update');
     Route::delete('/workers/{id}', [WorkerController::class, 'destroy'])->name('workers.destroy');
 
     Route::get('finance', [FinanceController::class, 'index'])->name('finance.index');

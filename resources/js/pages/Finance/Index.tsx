@@ -7,7 +7,10 @@ export default function FinanceIndex({ workers }) {
         worker_id: '',
         description: '',
         price: '',
+        password: '',
     });
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
+    const [shakePassword, setShakePassword] = useState(false);
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -27,6 +30,7 @@ export default function FinanceIndex({ workers }) {
                 worker_id: '',
                 description: '',
                 price: '',
+                password: '',
             });
             setIsSubmitting(false);
         }
@@ -38,12 +42,24 @@ export default function FinanceIndex({ workers }) {
             ...prev,
             [name]: value
         }));
+
+        // clear related error when the user edits the field
+        if (name && errors[name]) {
+            setErrors(prev => {
+                const next = { ...prev };
+                delete next[name];
+                return next;
+            });
+        }
+        if (name === 'password') {
+            setShakePassword(false);
+        }
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
         
-        if (!formData.worker_id || !formData.price || !formData.description) {
+        if (!formData.worker_id || !formData.price || !formData.description || !formData.password) {
             alert('لطفاً همه فیلدهای ضروری را پر کنید');
             return;
         }
@@ -55,15 +71,22 @@ export default function FinanceIndex({ workers }) {
             preserveScroll: true,
             onSuccess: () => {
                 // فرم در useEffect ریست می‌شود
+                setErrors({});
             },
             onError: (errors) => {
                 console.log('خطا در ثبت:', errors);
+                setErrors(errors || {});
+                // If password was invalid, give a visual cue
+                if (errors && errors.password) {
+                    setShakePassword(true);
+                    setTimeout(() => setShakePassword(false), 600);
+                }
                 setIsSubmitting(false);
             }
         });
     };
 
-    const isFormValid = formData.worker_id && formData.price && formData.description;
+    const isFormValid = formData.worker_id && formData.price && formData.description && formData.password;
 
     return (
         <>
@@ -165,6 +188,35 @@ export default function FinanceIndex({ workers }) {
                                 className="w-full px-4 py-3.5 text-base border-2 border-gray-200 rounded-xl focus:ring-3 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm text-right text-gray-800 placeholder-gray-400 resize-none"
                                 disabled={isSubmitting}
                             />
+                        </div>
+
+                        {/* Password Input */}
+                        <div className="mb-4">
+                            <label htmlFor="password" className="block text-gray-700 font-medium mb-2 text-right">
+                                رمز پرسنل *
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type="password"
+                                    id="password"
+                                    name="password"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    placeholder="رمز پرسنل را وارد کنید"
+                                    className={`w-full px-4 py-3.5 text-base border-2 rounded-xl focus:ring-3 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm text-right text-gray-800 placeholder-gray-400 ${
+                                        errors.password ? 'border-red-400 ring-1 ring-red-300' : 'border-gray-200'
+                                    } ${shakePassword ? 'animate-pulse' : ''}`}
+                                    disabled={isSubmitting}
+                                />
+                            </div>
+                            {errors.password && (
+                                <p className="mt-2 text-sm text-red-600 flex items-center gap-2 text-right">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M21 12A9 9 0 1112 3a9 9 0 019 9z" />
+                                    </svg>
+                                    {errors.password}
+                                </p>
+                            )}
                         </div>
 
                         {/* Submit Button */}

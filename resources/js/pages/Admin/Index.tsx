@@ -22,8 +22,11 @@ type PageProps = {
 
 export default function AdminIndex({ workers }: PageProps) {
     const { flash } = usePage().props as { flash?: FlashBag };
-    const form = useForm({ name: '' });
+    const form = useForm({ name: '', password: '' });
     const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false);
+    const editForm = useForm({ name: '', password: '' });
+    const [showEditModal, setShowEditModal] = useState<boolean>(false);
+    const [editingWorkerId, setEditingWorkerId] = useState<number | null>(null);
 
     useEffect(() => {
         if (flash?.message || flash?.success) {
@@ -39,7 +42,7 @@ export default function AdminIndex({ workers }: PageProps) {
         e.preventDefault();
         form.post('/workers', {
             preserveScroll: true,
-            onSuccess: () => form.reset('name'),
+            onSuccess: () => form.reset('name', 'password'),
         });
     };
 
@@ -47,6 +50,28 @@ export default function AdminIndex({ workers }: PageProps) {
         const confirmed = window.confirm(`آیا از حذف «${name}» مطمئن هستید؟`);
         if (!confirmed) return;
         router.delete(`/workers/${id}`, { preserveScroll: true });
+    };
+
+    const openEdit = (worker: Worker) => {
+        setEditingWorkerId(worker.id);
+        editForm.setData('name', worker.name);
+        editForm.setData('password', '');
+        setShowEditModal(true);
+    };
+
+    const closeEdit = () => {
+        setShowEditModal(false);
+        setEditingWorkerId(null);
+        editForm.reset('name', 'password');
+    };
+
+    const submitEdit = (e: FormEvent) => {
+        e.preventDefault();
+        if (!editingWorkerId) return;
+        editForm.put(`/workers/${editingWorkerId}`, {
+            preserveScroll: true,
+            onSuccess: () => closeEdit(),
+        });
     };
 
     const formatDate = (value?: string) => {
@@ -134,6 +159,16 @@ export default function AdminIndex({ workers }: PageProps) {
                                     required
                                 />
                             </div>
+                            <div className="w-full md:w-64">
+                                <input
+                                    type="password"
+                                    value={form.data.password}
+                                    onChange={(e) => form.setData('password', e.target.value)}
+                                    placeholder="رمز عبور برای پرسنل"
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    required
+                                />
+                            </div>
                             <button
                                 type="submit"
                                 disabled={form.processing}
@@ -177,15 +212,27 @@ export default function AdminIndex({ workers }: PageProps) {
                                                     </div>
                                                 </Link>
 
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeWorker(worker.id, worker.name)}
-                                                    className="text-gray-300 hover:text-red-500 p-2 transition-colors"
-                                                >
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                </button>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openEdit(worker)}
+                                                        className="text-gray-400 hover:text-blue-500 p-2 transition-colors"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536M9 11l6-6 3 3-6 6H9v-3z" />
+                                                        </svg>
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeWorker(worker.id, worker.name)}
+                                                        className="text-gray-300 hover:text-red-500 p-2 transition-colors"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             <div className="border-t border-gray-50 mt-4 pt-3 flex justify-between items-center">
@@ -202,6 +249,36 @@ export default function AdminIndex({ workers }: PageProps) {
                             )}
                         </div>
                     </div>
+
+                    {showEditModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                                <h3 className="text-lg font-bold mb-4">ویرایش پرسنل</h3>
+                                <form onSubmit={submitEdit} className="flex flex-col gap-3">
+                                    <input
+                                        type="text"
+                                        value={editForm.data.name}
+                                        onChange={(e) => editForm.setData('name', e.target.value)}
+                                        placeholder="نام پرسنل"
+                                        className="w-full px-3 py-2 border rounded"
+                                        required
+                                    />
+                                    <input
+                                        type="password"
+                                        value={editForm.data.password}
+                                        onChange={(e) => editForm.setData('password', e.target.value)}
+                                        placeholder="رمز عبور جدید (اختیاری)"
+                                        className="w-full px-3 py-2 border rounded"
+                                    />
+                                    <div className="flex justify-end gap-2 mt-2">
+                                        <button type="button" onClick={closeEdit} className="px-4 py-2 bg-gray-200 rounded">انصراف</button>
+                                        <button type="submit" disabled={editForm.processing} className="px-4 py-2 bg-blue-300 text-blue-900 rounded">ذخیره</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
                 </div>
             </div>
         </>

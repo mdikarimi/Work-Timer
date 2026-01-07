@@ -7,6 +7,8 @@ use App\Models\Worker;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 class FinanceController extends Controller
 {
@@ -55,9 +57,19 @@ class FinanceController extends Controller
             'worker_id' => 'required|exists:workers,id',
             'description' => 'required|string|max:255',
             'price' => 'required|integer|min:0',
+            'password' => 'required|string',
         ]);
 
-        Finance::create($validated);
+        $worker = Worker::find($validated['worker_id']);
+        if (!$worker || !Hash::check($validated['password'], $worker->password)) {
+            throw ValidationException::withMessages(['password' => ['رمز عبور اشتباه است.']]);
+        }
+
+        Finance::create([
+            'worker_id' => $validated['worker_id'],
+            'description' => $validated['description'],
+            'price' => $validated['price'],
+        ]);
 
         return back()->with('success', 'عملیات مالی با موفقیت ثبت شد.');
     }

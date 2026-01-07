@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Hash;
 
 class WorkerController extends Controller
 {
@@ -25,8 +26,13 @@ class WorkerController extends Controller
             'name' => 'required|string'
         ]);
 
+        $request->validate([
+            'password' => 'required|string|min:4'
+        ]);
+
         auth()->user()->workers()->create([
-            'name' => $request->name
+            'name' => $request->name,
+            'password' => Hash::make($request->password),
         ]);
 
         return redirect()->back()->with('message', 'نیرو اضافه شد');
@@ -150,6 +156,28 @@ class WorkerController extends Controller
                 'yearly_total' => $yearlyFinance,
             ],
         ]);
+    }
+
+    // ویرایش اطلاعات نیرو
+    public function update(Request $request, $id)
+    {
+        $worker = auth()->user()->workers()->findOrFail($id);
+
+        $request->validate([
+            'name' => 'required|string'
+        ]);
+
+        if ($request->filled('password')) {
+            $request->validate([
+                'password' => 'nullable|string|min:4'
+            ]);
+            $worker->password = Hash::make($request->password);
+        }
+
+        $worker->name = $request->name;
+        $worker->save();
+
+        return redirect()->back()->with('message', 'اطلاعات نیرو بروز شد');
     }
 
     // حذف نیرو

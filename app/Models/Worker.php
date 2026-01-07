@@ -9,6 +9,7 @@ class Worker extends Model
     protected $fillable = [
         'name',
         'user_id',
+        'password',
     ];
     
     public function attendances()
