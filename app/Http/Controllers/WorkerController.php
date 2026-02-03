@@ -19,7 +19,6 @@ class WorkerController extends Controller
             'workers' => $workers,
         ]);
     }
-
     public function store(Request $request)
     {
         $request->validate([
@@ -30,12 +29,12 @@ class WorkerController extends Controller
             'password' => 'required|string|min:4'
         ]);
 
-        auth()->user()->workers()->create([
+        $worker = auth()->user()->workers()->create([
             'name' => $request->name,
             'password' => Hash::make($request->password),
         ]);
 
-        return redirect()->back()->with('message', 'نیرو اضافه شد');
+        return redirect()->route('workers.report', $worker->id)->with('new_password', $request->password);
     }
 
     public function show(Request $request, Worker $worker)
@@ -47,6 +46,9 @@ class WorkerController extends Controller
 
         // انتخاب تاریخ (از کوئری استرینگ) یا امروز
         $date = $request->query('date', Carbon::now()->toDateString());
+        $mode = $request->query('mode', 'day');
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
         $now = Carbon::parse($date);
 
         // Attendance summaries (weekly and monthly minutes)
@@ -86,11 +88,14 @@ class WorkerController extends Controller
             ->whereYear('created_at', $now->year)
             ->sum('price');
 
-        // اگر تاریخ مشخص شده باشد، داده‌ها را به آن روز محدود می‌کنیم
+        // اگر تاریخ مشخص شده باشد، داده‌ها را به آن روز محدود می‌کنیم (اگر mode روز باشد)
         $attendanceQuery = $worker->attendances()->latest();
         $financesQuery = $worker->finances()->latest();
 
-        if ($request->has('date')) {
+        if ($mode === 'range' && $startDate && $endDate) {
+            $attendanceQuery->whereBetween('date', [$startDate, $endDate]);
+            $financesQuery->whereBetween('created_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59']);
+        } elseif ($request->has('date') && $mode === 'day') {
             $attendanceQuery->whereDate('date', $date);
             $financesQuery->whereDate('created_at', $date);
         }
@@ -142,6 +147,9 @@ class WorkerController extends Controller
         return Inertia::render('Admin/WorkerReport', [
             'worker' => $worker,
             'date' => $date,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'mode' => $mode,
             'attendance' => $attendanceQuery->paginate(10),
             'finances' => $financesQuery->paginate(10),
             'total_paid' => $worker->finances()->sum('price'),
@@ -158,7 +166,6 @@ class WorkerController extends Controller
         ]);
     }
 
-    // ویرایش اطلاعات نیرو
     public function update(Request $request, $id)
     {
         $worker = auth()->user()->workers()->findOrFail($id);
@@ -179,8 +186,6 @@ class WorkerController extends Controller
 
         return redirect()->back()->with('message', 'اطلاعات نیرو بروز شد');
     }
-
-    // حذف نیرو
     public function destroy($id)
     {
         $worker = auth()->user()->workers()->findOrFail($id);

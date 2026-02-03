@@ -14,6 +14,7 @@ Route::middleware('guest')->group(function () {
     Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
     Route::post('/register', [RegisterController::class, 'register']);
 });
+    Route::get('finance', [FinanceController::class, 'index'])->name('finance.index');
 
 Route::middleware('auth')->group(function () {
     Route::get('/', [AttendanceController::class, 'viewAttendance'])->name('attendance.view');
@@ -25,10 +26,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin', [WorkerController::class, 'viewAdmin'])->name('admin.view');
     Route::get('/workers/{worker}/report', [WorkerController::class, 'show'])->name('workers.report');
     Route::post('/workers', [WorkerController::class, 'store'])->name('workers.store');
-    Route::put('/workers/{id}', [WorkerController::class, 'update'])->name('workers.update');
+    Route::match(['put','patch'], '/workers/{id}', [WorkerController::class, 'update'])->name('workers.update');
     Route::delete('/workers/{id}', [WorkerController::class, 'destroy'])->name('workers.destroy');
 
-    Route::get('finance', [FinanceController::class, 'index'])->name('finance.index');
     Route::get('finance/list', [FinanceController::class, 'list'])->name('finance.list');
     Route::post('finance', [FinanceController::class, 'store'])->name('finance.store');
 

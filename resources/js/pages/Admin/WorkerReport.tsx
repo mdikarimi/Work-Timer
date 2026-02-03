@@ -1,8 +1,13 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import moment from 'jalali-moment';
 import React, { useEffect, useState } from 'react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
+import DatePicker, { DateObject } from 'react-multi-date-picker';
+import persian from 'react-date-object/calendars/persian';
+import persian_fa from 'react-date-object/locales/persian_fa';
+import gregorian from 'react-date-object/calendars/gregorian';
+import { FormControl, InputLabel as MUIInputLabel, MenuItem, Select } from "@mui/material";
+import { X } from "lucide-react";
+import { toJalaali, toGregorian } from 'jalaali-js';
 
 type Attendance = {
     id: number;
@@ -18,11 +23,14 @@ type Finance = {
 };
 
 type PageProps = {
-    worker: { id: number; name: string; code?: string };
+    worker: { id: number; name: string; code?: string; password?: string };
     attendance: { data: Attendance[] };
     finances: { data: Finance[] };
     total_paid: number;
     date?: string;
+    start_date?: string;
+    end_date?: string;
+    mode?: string;
     monthly_finance_total?: number;
     monthly_report?: { date: string; minutes: number; finance: number }[];
     attendance_summary?: { weekly_minutes: number; monthly_minutes: number };
@@ -35,27 +43,72 @@ export default function WorkerReport({
     finances,
     total_paid,
     date,
+    start_date,
+    end_date,
+    mode,
     monthly_finance_total,
     monthly_report = [],
     attendance_summary,
     finance_summary,
 }: PageProps) {
-    const { flash } = usePage().props as { flash?: { message?: string; success?: string } };
+    const { flash } = usePage().props as { flash?: { message?: string; success?: string; new_password?: string } };
     const [selectedDate, setSelectedDate] = useState<string>(date ?? moment().format('YYYY-MM-DD'));
-    const [datePickerDate, setDatePickerDate] = useState<Date | null>(moment(selectedDate, 'YYYY-MM-DD').toDate());
     const [selectedDay, setSelectedDay] = useState<string>(date ?? selectedDate);
-    const [pickerMode, setPickerMode] = useState<'day' | 'month'>('day');
+    const [startDate, setStartDate] = useState<string>(start_date ?? '');
+    const [endDate, setEndDate] = useState<string>(end_date ?? '');
+    const [startDateValue, setStartDateValue] = useState<DateObject | null>(null);
+    const [endDateValue, setEndDateValue] = useState<DateObject | null>(null);
     const [isMobile, setIsMobile] = useState<boolean>(false);
+    const [showDateDialog, setShowDateDialog] = useState(false);
+    const [year, setYear] = useState("");
+    const [month, setMonth] = useState("");
+    const [day, setDay] = useState("");
+
+    const currentPersianYear = toJalaali(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate()).jy;
+
+    const years = Array.from({ length: 10 }, (_, i) => currentPersianYear - 9 + i);
+    const monthsFa = [
+        { value: 1, label: "فروردین" },
+        { value: 2, label: "اردیبهشت" },
+        { value: 3, label: "خرداد" },
+        { value: 4, label: "تیر" },
+        { value: 5, label: "مرداد" },
+        { value: 6, label: "شهریور" },
+        { value: 7, label: "مهر" },
+        { value: 8, label: "آبان" },
+        { value: 9, label: "آذر" },
+        { value: 10, label: "دی" },
+        { value: 11, label: "بهمن" },
+        { value: 12, label: "اسفند" },
+    ];
+    const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
     // Effects
     useEffect(() => {
         setSelectedDate(date ?? moment().format('YYYY-MM-DD'));
-        setDatePickerDate(moment(date ?? moment().format('YYYY-MM-DD'), 'YYYY-MM-DD').toDate());
     }, [date]);
 
     useEffect(() => {
         setSelectedDay(date ?? selectedDate);
     }, [date, selectedDate]);
+
+    useEffect(() => {
+        setStartDate(start_date ?? '');
+        if (start_date) {
+            setStartDateValue(new DateObject({ date: start_date, calendar: gregorian }));
+        } else {
+            setStartDateValue(null);
+        }
+    }, [start_date]);
+
+    useEffect(() => {
+        setEndDate(end_date ?? '');
+        if (end_date) {
+            setEndDateValue(new DateObject({ date: end_date, calendar: gregorian }));
+        } else {
+            setEndDateValue(null);
+        }
+    }, [end_date]);
 
     // Check mobile on mount and resize
     useEffect(() => {
@@ -74,67 +127,84 @@ export default function WorkerReport({
         return new Date(dateStr).toLocaleDateString('fa-IR');
     };
 
-    const shiftDate = (offset: number) => {
-        const current = moment(selectedDate, 'YYYY-MM-DD');
-        current.add(offset, 'days');
-        return current.format('YYYY-MM-DD');
-    };
-
-    const goToDate = (nextDate: string) => {
-        router.get(`/workers/${worker.id}/report`, { date: nextDate }, { preserveState: true, preserveScroll: true });
-    };
-
-    const handleDateChange = (d: Date | null) => {
-        if (d) {
-            const formatted = moment(d).format('YYYY-MM-DD');
-            setSelectedDate(formatted);
-            setDatePickerDate(d);
-            goToDate(formatted);
-        }
-    };
-
     const formatPrice = (price: number) => {
         return new Intl.NumberFormat('fa-IR').format(price) + (isMobile ? '' : ' تومان');
     };
 
-    const formatHours = (minutes?: number | null) => {
+    const formatHours = (minutes?: number | null, roundTo: number = 30) => {
         if (minutes === null || minutes === undefined) return '-';
-        const total = Number(minutes) || 0;
+        
+        const roundedMinutes = Math.round(Number(minutes) / roundTo) * roundTo;
+        const total = roundedMinutes || 0;
+        
         const h = Math.floor(total / 60);
         const m = total % 60;
         const pad = (n: number) => String(n).padStart(2, '0');
         const persianDigits = (s: string) => s.replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
+        
         return persianDigits(`${pad(h)}:${pad(m)}`);
     };
 
-    // DatePicker locale configuration
-    const locale = {
-        localize: {
-            day: (n: number) => moment.localeData('fa').weekdays()[n],
-            month: (n: number) => moment.localeData('fa').months()[n],
-        },
-        formatLong: {
-            date: () => 'yyyy/MM/dd',
-        },
+    const copyToClipboard = async (text?: string) => {
+        if (!text) return;
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch (e) {
+            // ignore
+        }
     };
 
-    // Custom DatePicker input component
-    const CustomInput = React.forwardRef(({ value, onClick, pickerMode }: any, ref: any) => (
-        <button
-            type="button"
-            className="w-full rounded-lg border-2 border-gray-200 px-3 py-2 text-right text-sm text-gray-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 md:px-4 md:py-2 md:text-base"
-            onClick={onClick}
-            ref={ref}
-        >
-            {value
-                ? pickerMode === 'month'
-                    ? moment(value, 'YYYY-MM-DD').locale('fa').format('jYYYY/jMM')
-                    : moment(value, 'YYYY-MM-DD').locale('fa').format(isMobile ? 'jMM/jDD' : 'jYYYY/jMM/jDD')
-                : pickerMode === 'month'
-                  ? (isMobile ? 'انتخاب' : 'انتخاب ماه')
-                  : (isMobile ? 'انتخاب' : 'انتخاب تاریخ')}
-        </button>
-    ));
+    const flashedPassword = flash?.new_password;
+
+    // تابع تبدیل تاریخ میلادی به شمسی
+    function convertToPersianDate(gregorianDate: string) {
+        if (!gregorianDate) return "";
+        try {
+            const [year, month, day] = gregorianDate.split('-').map(Number);
+            const jalaali = toJalaali(year, month, day);
+            return `${jalaali.jy}/${String(jalaali.jm).padStart(2, '0')}/${String(jalaali.jd).padStart(2, '0')}`;
+        } catch (error) {
+            console.error("Error converting to persian date:", error);
+            return "";
+        }
+    }
+
+    // تابع تبدیل تاریخ شمسی به میلادی
+    function convertToGregorianDate(persianDateStr: string) {
+        if (!persianDateStr) return "";
+        try {
+            const [jy, jm, jd] = persianDateStr.split('/').map(Number);
+            const gregorian = toGregorian(jy, jm, jd);
+            return `${gregorian.gy}-${String(gregorian.gm).padStart(2, '0')}-${String(gregorian.gd).padStart(2, '0')}`;
+        } catch (error) {
+            console.error("Error converting to gregorian date:", error);
+            return "";
+        }
+    }
+
+    const handleStartDateChange = (date: DateObject | null) => {
+        if (date) {
+            const dateStr = date.convert(gregorian).format('YYYY-MM-DD');
+            setStartDate(dateStr);
+            setStartDateValue(date);
+        } else {
+            setStartDate('');
+            setStartDateValue(null);
+        }
+    };
+
+    const handleEndDateChange = (date: DateObject | null) => {
+        if (date) {
+            const dateStr = date.convert(gregorian).format('YYYY-MM-DD');
+            setEndDate(dateStr);
+            setEndDateValue(date);
+        } else {
+            setEndDate('');
+            setEndDateValue(null);
+        }
+    };
+
+    // تابع رندر custom input برای تاریخ شمسی - دیگر نیاز نیست چون Calendar input دارد
 
     const selectedDayData = monthly_report.find((r) => r.date === selectedDay) || null;
 
@@ -169,119 +239,52 @@ export default function WorkerReport({
 
                     {/* Date Picker Section */}
                     <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3 shadow-sm md:mb-6 md:p-4">
-                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
-                                <div className="flex items-center justify-between gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => goToDate(shiftDate(-1))}
-                                        className="flex-1 rounded-lg bg-gray-100 px-3 py-1.5 text-xs text-gray-700 shadow-md transition hover:bg-gray-200 md:px-4 md:py-2 md:text-sm"
-                                    >
-                                        {isMobile ? 'قبلی' : 'روز قبل'}
-                                    </button>
-
-                                    <div className="relative flex-1">
-                                        <DatePicker
-                                            selected={datePickerDate}
-                                            onChange={(d) => {
-                                                if (!d) return;
-                                                if (pickerMode === 'month') {
-                                                    const first = moment(d).startOf('month').format('YYYY-MM-DD');
-                                                    setDatePickerDate(moment(first, 'YYYY-MM-DD').toDate());
-                                                    setSelectedDate(first);
-                                                    goToDate(first);
-                                                } else {
-                                                    handleDateChange(d);
-                                                }
-                                            }}
-                                            dateFormat={pickerMode === 'month' ? 'yyyy/MM' : 'yyyy/MM/dd'}
-                                            showMonthYearPicker={pickerMode === 'month'}
-                                            locale={locale}
-                                            customInput={<CustomInput pickerMode={pickerMode} />}
-                                            showPopperArrow={false}
-                                            popperPlacement="bottom"
-                                            renderCustomHeader={({
-                                                date,
-                                                decreaseMonth,
-                                                increaseMonth,
-                                                prevMonthButtonDisabled,
-                                                nextMonthButtonDisabled,
-                                            }) => (
-                                                <div className="flex items-center justify-between px-4 py-2">
-                                                    <button type="button" onClick={decreaseMonth} disabled={prevMonthButtonDisabled} className="p-1">
-                                                        ‹
-                                                    </button>
-                                                    <span className="text-base font-semibold md:text-lg">
-                                                        {moment(date).locale('fa').format('jMMMM jYYYY')}
-                                                    </span>
-                                                    <button type="button" onClick={increaseMonth} disabled={nextMonthButtonDisabled} className="p-1">
-                                                        ›
-                                                    </button>
-                                                </div>
-                                            )}
-                                        />
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => goToDate(shiftDate(1))}
-                                        className="flex-1 rounded-lg bg-gray-100 px-3 py-1.5 text-xs text-gray-700 shadow-md transition hover:bg-gray-200 md:px-4 md:py-2 md:text-sm"
-                                    >
-                                        {isMobile ? 'بعدی' : 'روز بعد'}
-                                    </button>
-                                </div>
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">از تاریخ</label>
+                                <DatePicker
+                                    value={startDateValue}
+                                    onChange={handleStartDateChange}
+                                    locale={persian_fa}
+                                    calendar={persian}
+                                    format="YYYY/MM/DD"
+                                    inputClass="w-full rounded-lg border-2 border-gray-200 px-3 py-2 text-right text-sm text-gray-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                                    placeholder="انتخاب تاریخ"
+                                />
                             </div>
-
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">تا تاریخ</label>
+                                <DatePicker
+                                    value={endDateValue}
+                                    onChange={handleEndDateChange}
+                                    locale={persian_fa}
+                                    calendar={persian}
+                                    format="YYYY/MM/DD"
+                                    inputClass="w-full rounded-lg border-2 border-gray-200 px-3 py-2 text-right text-sm text-gray-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                                    placeholder="انتخاب تاریخ"
+                                />
+                            </div>
                             <button
                                 type="button"
-                                onClick={() => goToDate(moment().format('YYYY-MM-DD'))}
-                                className="mt-2 rounded-lg bg-gray-100 px-4 py-1.5 text-xs text-gray-700 shadow-md transition hover:bg-gray-200 md:mt-0 md:py-2 md:text-sm"
+                                onClick={() => {
+                                    if (startDate && endDate) {
+                                        router.get(`/workers/${worker.id}/report`, { 
+                                            mode: 'range', 
+                                            start_date: startDate, 
+                                            end_date: endDate 
+                                        }, { 
+                                            preserveState: true, 
+                                            preserveScroll: true 
+                                        });
+                                    }
+                                }}
+                                className="mt-6 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white shadow-md transition hover:bg-blue-700 md:mt-0"
                             >
-                                امروز
+                                اعمال فیلتر
                             </button>
                         </div>
                     </div>
-
-                    {/* Monthly Finance Card */}
-                    <div className="mb-4 md:mb-6">
-                        <div className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-lg md:flex-row md:items-center md:justify-between md:p-6">
-                            <div>
-                                <p className="text-xs text-gray-500 md:text-sm">گزارش مالی ماه</p>
-                                <h2 className="mt-1 text-xl font-extrabold text-gray-900 md:text-3xl">
-                                    {formatPrice(monthly_finance_total ?? finance_summary?.monthly_total ?? 0)}
-                                </h2>
-                            </div>
-                            <div className="text-right text-xs text-gray-400 md:text-sm">
-                                <p>
-                                    گزارش ماه:{' '}
-                                    {moment(date ?? selectedDate)
-                                        .locale('fa')
-                                        .format('jMMMM jYYYY')}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Hours Summary */}
-                    <div className="mb-4 md:mb-6">
-                        <div className="grid grid-cols-3 gap-2 md:flex md:w-full md:max-w-md md:items-center md:gap-3">
-                            <div className="rounded-xl bg-white px-3 py-2 text-right text-gray-800 shadow md:rounded-2xl md:px-4 md:py-3">
-                                <span className="mb-0.5 block text-[10px] text-gray-500 md:mb-1 md:text-xs">امروز</span>
-                                <span className="text-base font-bold md:text-lg">{formatHours(selectedDayData?.minutes ?? 0)}</span>
-                            </div>
-
-                            <div className="rounded-xl bg-white px-3 py-2 text-right text-gray-800 shadow md:rounded-2xl md:px-4 md:py-3">
-                                <span className="mb-0.5 block text-[10px] text-gray-500 md:mb-1 md:text-xs">هفته</span>
-                                <span className="text-base font-bold md:text-lg">{formatHours(attendance_summary?.weekly_minutes ?? 0)}</span>
-                            </div>
-
-                            <div className="rounded-xl bg-white px-3 py-2 text-right text-gray-800 shadow md:rounded-2xl md:px-4 md:py-3">
-                                <span className="mb-0.5 block text-[10px] text-gray-500 md:mb-1 md:text-xs">ماه</span>
-                                <span className="text-base font-bold md:text-lg">{formatHours(attendance_summary?.monthly_minutes ?? 0)}</span>
-                            </div>
-                        </div>
-                    </div>
-
+                    
                     {/* Main Content Grid */}
                     <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-2">
                         {/* Attendance Section */}

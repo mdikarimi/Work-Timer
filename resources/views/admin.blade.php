@@ -118,19 +118,28 @@
                                 </div>
                             </div>
 
-                            <form method="POST" action="{{ route('workers.destroy', $worker->id) }}"
-                                onsubmit="return confirm('آیا از حذف «{{ $worker->name }}» اطمینان دارید؟')"
-                                class="flex-shrink-0">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit"
-                                    class="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition duration-200">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </button>
-                            </form>
+                            <div class="flex items-center gap-2 flex-shrink-0">
+                                <form method="POST" action="{{ route('workers.update', $worker->id) }}" class="flex items-center gap-2">
+                                    @csrf
+                                    @method('PATCH')
+                                    <input type="text" name="name" value="{{ $worker->name }}" class="text-sm px-2 py-1 border rounded" required />
+                                    <input type="password" name="password" placeholder="رمز جدید (اختیاری)" class="text-sm px-2 py-1 border rounded" />
+                                    <button type="submit" class="text-blue-600 hover:text-blue-800 p-2 rounded-lg">ذخیره</button>
+                                </form>
+
+                                <form method="POST" action="{{ route('workers.destroy', $worker->id) }}"
+                                    onsubmit="return confirm('آیا از حذف «{{ $worker->name }}» اطمینان دارید؟')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit"
+                                        class="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition duration-200">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                </form>
+                            </div>
                         </div>
 
                         <div class="border-t border-gray-100 pt-4">
@@ -181,17 +190,27 @@
                                     </div>
                                 </div>
 
-                                <form method="POST" action="{{ route('workers.destroy', $worker->id) }}"
-                                    onsubmit="return confirm('آیا از حذف «{{ $worker->name }}» اطمینان دارید؟')">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="text-red-500 hover:text-red-700 p-2">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </form>
+                                <div class="flex items-center gap-2">
+                                    <form method="POST" action="{{ route('workers.update', $worker->id) }}" class="flex items-center gap-2">
+                                        @csrf
+                                        @method('PATCH')
+                                        <input type="text" name="name" value="{{ $worker->name }}" class="text-sm px-2 py-1 border rounded" required />
+                                        <input type="password" name="password" placeholder="رمز جدید (اختیاری)" class="text-sm px-2 py-1 border rounded" />
+                                        <button type="submit" class="text-blue-600 hover:text-blue-800 p-2">ذخیره</button>
+                                    </form>
+
+                                    <form method="POST" action="{{ route('workers.destroy', $worker->id) }}"
+                                        onsubmit="return confirm('آیا از حذف «{{ $worker->name }}» اطمینان دارید؟')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-red-500 hover:text-red-700 p-2">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
 
                             <!-- ردیف دوم: اطلاعات تکمیلی -->
