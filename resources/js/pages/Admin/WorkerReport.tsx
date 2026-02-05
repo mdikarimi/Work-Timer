@@ -1,4 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import React from 'react';
 import { toGregorian, toJalaali } from 'jalaali-js';
 import moment from 'jalali-moment';
 import { Calendar, CalendarRange, Clock, DollarSign, TrendingUp, X } from 'lucide-react';
@@ -72,6 +73,7 @@ export default function WorkerReport({
     const [endDateValue, setEndDateValue] = useState<DateObject | null>(null);
     const [isMobile, setIsMobile] = useState<boolean>(false);
     const [showDateDialog, setShowDateDialog] = useState(false);
+    const [showDayDetails, setShowDayDetails] = useState(false);
     const [year, setYear] = useState('');
     const [month, setMonth] = useState('');
     const [day, setDay] = useState('');
@@ -146,6 +148,33 @@ export default function WorkerReport({
         } catch (e) {
             return dateStr;
         }
+    };
+
+    // handler to toggle day details panel
+    const handleRowClick = (date: string) => {
+        if (selectedDay === date && showDayDetails) {
+            setShowDayDetails(false);
+        } else {
+            setSelectedDay(date);
+            setShowDayDetails(true);
+        }
+    };
+
+    // attendances for currently selected day
+    const attendancesForSelectedDay = ((attendance?.data || []) as any[]).filter((a: any) => a.date === selectedDay);
+
+    // helper to extract time (H:i) from attendance fields (prefer jalali-formatted times when available)
+    const extractTime = (item: any, jalaliField: string, isoField: string) => {
+        if (!item) return '-';
+        // prefer jalali short times prepared by server
+        if (item[jalaliField]) return item[jalaliField];
+        if (item[isoField]) {
+            const parts = String(item[isoField]).split(' ');
+            if (parts.length > 1) return parts[1].slice(0, 5);
+            if (item[isoField].includes('T')) return item[isoField].split('T')[1].slice(0, 5);
+            return item[isoField];
+        }
+        return '-';
     };
 
     const formatPrice = (price: number) => {
@@ -385,7 +414,7 @@ export default function WorkerReport({
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="mb-1 text-sm font-medium text-gray-600">مجموع زمان</p>
-                                        <p className="text-2xl font-bold text-gray-900">{formatHours(totalMinutes)}</p>
+                                        <p className="text-3xl font-bold text-gray-900">{formatHours(totalMinutes)}</p>
                                         <p className="mt-1 text-xs text-gray-500">{formatHoursDetailed(totalMinutes)}</p>
                                     </div>
                                     <div className="rounded-full bg-blue-100 p-3">
@@ -403,7 +432,7 @@ export default function WorkerReport({
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="mb-1 text-sm font-medium text-gray-600">مجموع مبلغ</p>
-                                        <p className="text-2xl font-bold text-gray-900">{formatPrice(totalFinance)}</p>
+                                        <p className="text-3xl font-bold text-gray-900">{formatPrice(totalFinance)}</p>
                                         <p className="mt-1 text-xs text-gray-500">{new Intl.NumberFormat('fa-IR').format(totalFinance)} تومان</p>
                                     </div>
                                     <div className="rounded-full bg-green-100 p-3">
@@ -448,28 +477,63 @@ export default function WorkerReport({
                                         <tbody className="divide-y divide-gray-100 bg-white">
                                             {monthly_report && monthly_report.length > 0 ? (
                                                 monthly_report.map((r) => (
-                                                    <tr
-                                                        key={r.date}
-                                                        onClick={() => setSelectedDay(r.date)}
-                                                        className={`cursor-pointer transition hover:bg-blue-50/50 ${
-                                                            selectedDay === r.date ? 'bg-blue-50' : ''
-                                                        }`}
-                                                    >
-                                                        <td className="px-4 py-3 text-sm text-gray-700">
-                                                            <div className="font-medium">{convertToPersianDate(r.date)}</div>
-                                                        </td>
-                                                        <td className="hidden px-4 py-3 text-sm text-gray-500 md:table-cell">{r.day_name ?? ''}</td>
-                                                        <td className="px-4 py-3">
-                                                            <div className="inline-flex items-center gap-2">
-                                                                <span className="text-sm font-bold text-gray-900">{formatHours(r.minutes, 30)}</span>
-                                                                {r.minutes > 0 && (
-                                                                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
-                                                                        {Math.round((r.minutes / 60) * 100) / 100} ساعت
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
+                                                    <React.Fragment key={r.date}>
+                                                        <tr
+                                                            key={r.date + '_row'}
+                                                            onClick={() => handleRowClick(r.date)}
+                                                            className={`cursor-pointer transition hover:bg-blue-50/50 ${
+                                                                selectedDay === r.date ? 'bg-blue-50' : ''
+                                                            }`}
+                                                        >
+                                                            <td className="px-4 py-3 text-sm text-gray-700">
+                                                                <div className="font-medium">{convertToPersianDate(r.date)}</div>
+                                                            </td>
+                                                            <td className="hidden px-4 py-3 text-sm text-gray-500 md:table-cell">{r.day_name ?? ''}</td>
+                                                            <td className="px-4 py-3">
+                                                                <div className="inline-flex items-center gap-2">
+                                                                    <span className="text-sm font-bold text-gray-900">{formatHours(r.minutes, 30)}</span>
+                                                                    {r.minutes > 0 && (
+                                                                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
+                                                                            {Math.round((r.minutes / 60) * 100) / 100} ساعت
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+
+                                                        {selectedDay === r.date && showDayDetails && (
+                                                            <tr key={r.date + '_details'} className="bg-blue-50">
+                                                                <td colSpan={3} className="px-4 py-3">
+                                                                    {attendancesForSelectedDay && attendancesForSelectedDay.length > 0 ? (
+                                                                        <div className="flex flex-col gap-2">
+                                                                            {attendancesForSelectedDay.map((a: any) => {
+                                                                                const ci = extractTime(a, 'check_in_jalali', 'check_in');
+                                                                                const co = extractTime(a, 'check_out_jalali', 'check_out');
+                                                                                const minutes = a.check_in && a.check_out ? Math.round((new Date(a.check_out).getTime() - new Date(a.check_in).getTime()) / 60000) : null;
+
+                                                                                return (
+                                                                                    <div key={a.id} className="rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-700">
+                                                                                        <div className="flex items-center justify-between">
+                                                                                            <div className="text-sm">
+                                                                                                <span className="text-green-600">ورود:</span>{' '}
+                                                                                                <span className="font-bold">{ci}</span>
+                                                                                                <span className="mx-2 text-gray-300">•</span>
+                                                                                                <span className="text-rose-600">خروج:</span>{' '}
+                                                                                                <span className="font-bold">{co}</span>
+                                                                                            </div>
+                                                                                            <div className="text-xs text-gray-500">{minutes ? formatHoursDetailed(minutes) : '-'}</div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="text-sm text-gray-500">برای این روز ورودی/خروجی ثبت نشده</div>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </React.Fragment>
                                                 ))
                                             ) : (
                                                 <tr>
