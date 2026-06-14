@@ -1,9 +1,8 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import React from 'react';
-import { toGregorian, toJalaali } from 'jalaali-js';
+import { Head, Link, router } from '@inertiajs/react';
+import { toJalaali } from 'jalaali-js';
 import moment from 'jalali-moment';
-import { Calendar, CalendarRange, Clock, DollarSign, TrendingUp, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Calendar, CalendarRange, Clock, DollarSign, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import gregorian from 'react-date-object/calendars/gregorian';
 import persian from 'react-date-object/calendars/persian';
 import persian_fa from 'react-date-object/locales/persian_fa';
@@ -25,7 +24,7 @@ type Finance = {
 type PageProps = {
     worker: { id: number; name: string; code?: string; password?: string };
     attendance: { data: Attendance[] };
-    finances: { data: Finance[] };
+    finances: Finance[];
     total_paid: number;
     date?: string;
     start_date?: string;
@@ -64,7 +63,6 @@ export default function WorkerReport({
     attendance_summary,
     finance_summary,
 }: PageProps) {
-    const { flash } = usePage().props as { flash?: { message?: string; success?: string; new_password?: string } };
     const [selectedDate, setSelectedDate] = useState<string>(date ?? moment().format('YYYY-MM-DD'));
     const [selectedDay, setSelectedDay] = useState<string>(date ?? selectedDate);
     const [startDate, setStartDate] = useState<string>(start_date ?? '');
@@ -72,30 +70,7 @@ export default function WorkerReport({
     const [startDateValue, setStartDateValue] = useState<DateObject | null>(null);
     const [endDateValue, setEndDateValue] = useState<DateObject | null>(null);
     const [isMobile, setIsMobile] = useState<boolean>(false);
-    const [showDateDialog, setShowDateDialog] = useState(false);
     const [showDayDetails, setShowDayDetails] = useState(false);
-    const [year, setYear] = useState('');
-    const [month, setMonth] = useState('');
-    const [day, setDay] = useState('');
-
-    const currentPersianYear = toJalaali(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate()).jy;
-
-    const years = Array.from({ length: 10 }, (_, i) => currentPersianYear - 9 + i);
-    const monthsFa = [
-        { value: 1, label: 'فروردین' },
-        { value: 2, label: 'اردیبهشت' },
-        { value: 3, label: 'خرداد' },
-        { value: 4, label: 'تیر' },
-        { value: 5, label: 'مرداد' },
-        { value: 6, label: 'شهریور' },
-        { value: 7, label: 'مهر' },
-        { value: 8, label: 'آبان' },
-        { value: 9, label: 'آذر' },
-        { value: 10, label: 'دی' },
-        { value: 11, label: 'بهمن' },
-        { value: 12, label: 'اسفند' },
-    ];
-    const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
     // Effects
     useEffect(() => {
@@ -209,17 +184,6 @@ export default function WorkerReport({
         return parts.join(' و ') || '0 دقیقه';
     };
 
-    const copyToClipboard = async (text?: string) => {
-        if (!text) return;
-        try {
-            await navigator.clipboard.writeText(text);
-        } catch (e) {
-            // ignore
-        }
-    };
-
-    const flashedPassword = flash?.new_password;
-
     // تابع تبدیل تاریخ میلادی به شمسی
     function convertToPersianDate(gregorianDate: string) {
         if (!gregorianDate) return '';
@@ -229,19 +193,6 @@ export default function WorkerReport({
             return `${jalaali.jy}/${String(jalaali.jm).padStart(2, '0')}/${String(jalaali.jd).padStart(2, '0')}`;
         } catch (error) {
             console.error('Error converting to persian date:', error);
-            return '';
-        }
-    }
-
-    // تابع تبدیل تاریخ شمسی به میلادی
-    function convertToGregorianDate(persianDateStr: string) {
-        if (!persianDateStr) return '';
-        try {
-            const [jy, jm, jd] = persianDateStr.split('/').map(Number);
-            const gregorian = toGregorian(jy, jm, jd);
-            return `${gregorian.gy}-${String(gregorian.gm).padStart(2, '0')}-${String(gregorian.gd).padStart(2, '0')}`;
-        } catch (error) {
-            console.error('Error converting to gregorian date:', error);
             return '';
         }
     }
@@ -283,15 +234,10 @@ export default function WorkerReport({
         );
     };
 
-    const selectedDayData = monthly_report.find((r) => r.date === selectedDay) || null;
-
     // محاسبه مجموع‌ها
     const totalMinutes = monthly_report.reduce((sum, r) => sum + (r.minutes || 0), 0);
     const totalFinance = monthly_report.reduce((sum, r) => sum + (r.finance || 0), 0);
     const daysCount = monthly_report.length;
-
-    // فرمت تاریخ بازه
-    const rangeDisplay = startDate && endDate ? `${convertToPersianDate(startDate)} — ${convertToPersianDate(endDate)}` : 'کل بازه زمانی';
 
     return (
         <>
@@ -315,9 +261,13 @@ export default function WorkerReport({
 
                         {/* Summary Cards - show total paid (small) */}
                         <div className="w-full md:w-auto">
-                            <div className="rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-3 text-center text-white shadow-lg md:rounded-2xl md:px-6 md:py-4">
-                                <span className="mb-1 block text-xs text-blue-100">کل پرداختی</span>
-                                <span className="text-lg font-bold md:text-xl">{formatPrice(total_paid)}</span>
+                            <div className="rounded-2xl bg-gradient-to-br from-purple-300 to-white p-5 shadow-sm">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="mb-1 text-sm font-medium text-gray-600">کل پرداختی</p>
+                                        <p className="text-3xl font-bold text-gray-900">{formatPrice(total_paid)}</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -415,7 +365,6 @@ export default function WorkerReport({
                                     <div>
                                         <p className="mb-1 text-sm font-medium text-gray-600">مجموع زمان</p>
                                         <p className="text-3xl font-bold text-gray-900">{formatHours(totalMinutes)}</p>
-                                        <p className="mt-1 text-xs text-gray-500">{formatHoursDetailed(totalMinutes)}</p>
                                     </div>
                                     <div className="rounded-full bg-blue-100 p-3">
                                         <Clock className="h-6 w-6 text-blue-600" />
@@ -433,7 +382,6 @@ export default function WorkerReport({
                                     <div>
                                         <p className="mb-1 text-sm font-medium text-gray-600">مجموع مبلغ</p>
                                         <p className="text-3xl font-bold text-gray-900">{formatPrice(totalFinance)}</p>
-                                        <p className="mt-1 text-xs text-gray-500">{new Intl.NumberFormat('fa-IR').format(totalFinance)} تومان</p>
                                     </div>
                                     <div className="rounded-full bg-green-100 p-3">
                                         <DollarSign className="h-6 w-6 text-green-600" />
@@ -488,10 +436,14 @@ export default function WorkerReport({
                                                             <td className="px-4 py-3 text-sm text-gray-700">
                                                                 <div className="font-medium">{convertToPersianDate(r.date)}</div>
                                                             </td>
-                                                            <td className="hidden px-4 py-3 text-sm text-gray-500 md:table-cell">{r.day_name ?? ''}</td>
+                                                            <td className="hidden px-4 py-3 text-sm text-gray-500 md:table-cell">
+                                                                {r.day_name ?? ''}
+                                                            </td>
                                                             <td className="px-4 py-3">
                                                                 <div className="inline-flex items-center gap-2">
-                                                                    <span className="text-sm font-bold text-gray-900">{formatHours(r.minutes, 30)}</span>
+                                                                    <span className="text-sm font-bold text-gray-900">
+                                                                        {formatHours(r.minutes, 30)}
+                                                                    </span>
                                                                     {r.minutes > 0 && (
                                                                         <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
                                                                             {Math.round((r.minutes / 60) * 100) / 100} ساعت
@@ -509,10 +461,20 @@ export default function WorkerReport({
                                                                             {attendancesForSelectedDay.map((a: any) => {
                                                                                 const ci = extractTime(a, 'check_in_jalali', 'check_in');
                                                                                 const co = extractTime(a, 'check_out_jalali', 'check_out');
-                                                                                const minutes = a.check_in && a.check_out ? Math.round((new Date(a.check_out).getTime() - new Date(a.check_in).getTime()) / 60000) : null;
+                                                                                const minutes =
+                                                                                    a.check_in && a.check_out
+                                                                                        ? Math.round(
+                                                                                              (new Date(a.check_out).getTime() -
+                                                                                                  new Date(a.check_in).getTime()) /
+                                                                                                  60000,
+                                                                                          )
+                                                                                        : null;
 
                                                                                 return (
-                                                                                    <div key={a.id} className="rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-700">
+                                                                                    <div
+                                                                                        key={a.id}
+                                                                                        className="rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-700"
+                                                                                    >
                                                                                         <div className="flex items-center justify-between">
                                                                                             <div className="text-sm">
                                                                                                 <span className="text-green-600">ورود:</span>{' '}
@@ -521,7 +483,6 @@ export default function WorkerReport({
                                                                                                 <span className="text-rose-600">خروج:</span>{' '}
                                                                                                 <span className="font-bold">{co}</span>
                                                                                             </div>
-                                                                                            <div className="text-xs text-gray-500">{minutes ? formatHoursDetailed(minutes) : '-'}</div>
                                                                                         </div>
                                                                                     </div>
                                                                                 );
@@ -573,8 +534,8 @@ export default function WorkerReport({
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100 bg-white">
-                                            {finances && finances.data && finances.data.length > 0 ? (
-                                                finances.data.map((item) => (
+                                            {finances && finances.length > 0 ? (
+                                                finances.map((item) => (
                                                     <tr key={item.id} className="transition hover:bg-green-50/30">
                                                         <td className="px-4 py-3 text-sm text-gray-700">{formatDate(item.created_at)}</td>
                                                         <td className="max-w-[150px] truncate px-4 py-3 text-sm text-gray-800">{item.description}</td>

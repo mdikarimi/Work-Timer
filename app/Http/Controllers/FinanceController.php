@@ -12,9 +12,6 @@ use Illuminate\Validation\ValidationException;
 
 class FinanceController extends Controller
 {
-    /**
-     * Display the finance form.
-     */
     public function index()
     {
         $workers = Worker::orderBy('name')->get(['id', 'name']);
@@ -26,18 +23,25 @@ class FinanceController extends Controller
 
     public function list(Request $request)
     {
-        // تاریخ پیش‌فرض امروز
+        $start_date = $request->get('start_date');
+        $end_date = $request->get('end_date');
         $date = $request->get('date', Carbon::today()->toDateString());
 
-        $query = Finance::with('worker')
-            ->whereDate('created_at', $date)
-            ->orderBy('created_at', 'desc');
+        $query = Finance::with('worker');
 
-        $finances = $query->paginate(20)->withQueryString();
+        if ($start_date && $end_date) {
+            $query->whereDate('created_at', '>=', $start_date)
+                  ->whereDate('created_at', '<=', $end_date);
+        } else {
+            $query->whereDate('created_at', $date);
+        }
+
+        $query->orderBy('created_at', 'desc');
+
+        $finances = $query->get();
 
         $workers = Worker::orderBy('name')->get(['id', 'name']);
 
-        // جمع کل مبالغ برای تاریخ انتخابی
         $totalAmount = $query->sum('price');
 
         return Inertia::render('Finance/List', [
@@ -45,12 +49,11 @@ class FinanceController extends Controller
             'workers' => $workers,
             'total_amount' => $totalAmount,
             'date' => $date,
+            'start_date' => $start_date,
+            'end_date' => $end_date,
         ]);
     }
     
-    /**
-     * Store a new finance record.
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([

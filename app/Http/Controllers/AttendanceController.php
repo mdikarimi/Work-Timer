@@ -24,32 +24,22 @@ class AttendanceController extends Controller
             ->map(function ($worker) {
                 $latestAttendance = $worker->attendances->first();
 
-                // وضعیت بر اساس آخرین رکورد
                 $status = 'absent';
                 if ($latestAttendance) {
-                    if ($latestAttendance->check_out) {
-                        // اگر آخرین رکورد خروج داشته باشد، یعنی کامل شده
-                        $status = 'complete';
-                    } else {
-                        // اگر فقط ورود داشته باشد، یعنی در حال کار است
-                        $status = 'working';
-                    }
+                    $status = $latestAttendance->check_out ? 'complete' : 'working';
                 }
 
-                // همه ورود و خروج‌های امروز
-                $attendancesToday = $worker->attendances->map(function ($att) {
-                    return [
-                        'check_in' => $att->check_in,
-                        'check_out' => $att->check_out,
-                    ];
-                });
+                $attendancesToday = $worker->attendances->map(fn($att) => [
+                    'check_in' => $att->check_in,
+                    'check_out' => $att->check_out,
+                ]);
 
                 return [
                     'id' => $worker->id,
                     'name' => $worker->name,
                     'code' => $worker->code,
                     'attendances' => $attendancesToday,
-                    'attendance' => [ // برای سازگاری با کد قبلی
+                    'attendance' => [
                         'check_in' => $latestAttendance?->check_in,
                         'check_out' => $latestAttendance?->check_out,
                         'status' => $status,
@@ -77,7 +67,6 @@ class AttendanceController extends Controller
     {
         $today = now()->toDateString();
 
-        // پیدا کردن تمام حضور و غیاب‌های امروز که خروج ندارند
         $incompleteAttendances = Attendance::where('date', $today)
             ->whereNotNull('check_in')
             ->whereNull('check_out')
@@ -101,24 +90,20 @@ class AttendanceController extends Controller
             'worker_id' => 'required|exists:workers,id'
         ]);
 
-        // Ensure worker belongs to authenticated user
         $worker = auth()->user()->workers()->findOrFail($request->worker_id);
 
         $today = now()->toDateString();
         $now = now();
 
-        // بررسی آخرین رکورد امروز
         $lastAttendance = Attendance::where('worker_id', $worker->id)
             ->where('date', $today)
             ->orderBy('created_at', 'desc')
             ->first();
 
-        // اگر آخرین رکورد بدون خروج باشد، نمی‌توان ورود جدید ثبت کرد
         if ($lastAttendance && !$lastAttendance->check_out) {
             return redirect()->back()->with('message', 'ابتدا باید خروج قبلی را ثبت کنید');
         }
 
-        // ایجاد رکورد جدید برای ورود
         $attendance = Attendance::create([
             'worker_id' => $worker->id,
             'date' => $today,
@@ -135,12 +120,10 @@ class AttendanceController extends Controller
             'worker_id' => 'required|exists:workers,id'
         ]);
 
-        // Ensure worker belongs to authenticated user
         $worker = auth()->user()->workers()->findOrFail($request->worker_id);
 
         $today = now()->toDateString();
 
-        // پیدا کردن آخرین رکورد بدون خروج برای امروز
         $attendance = Attendance::where('worker_id', $worker->id)
             ->where('date', $today)
             ->whereNull('check_out')
@@ -153,13 +136,6 @@ class AttendanceController extends Controller
 
         $attendance->update(['check_out' => now()]);
         return redirect()->back()->with('message', 'خروج ثبت شد');
-    }
-
-    public function all()
-    {
-        return Attendance::with('worker')
-            ->orderBy('date', 'desc')
-            ->get();
     }
 
     public function list(Request $request): Response

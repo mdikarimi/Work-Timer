@@ -24,17 +24,12 @@ type Worker = {
 };
 
 type PageProps = {
-    finances: {
-        data: FinanceRecord[];
-        current_page: number;
-        last_page: number;
-        per_page: number;
-        total: number;
-        links: any[];
-    };
+    finances: FinanceRecord[];
     workers: Worker[];
     total_amount: number;
     date: string;
+    start_date?: string;
+    end_date?: string;
     flash?: {
         message?: string | null;
         success?: string | null;
@@ -42,16 +37,24 @@ type PageProps = {
     };
 };
 
-export default function FinanceList({ finances, workers, total_amount, date }: PageProps) {
+export default function FinanceList({ finances, workers, total_amount, date, start_date, end_date }: PageProps) {
     const { flash } = usePage().props as PageProps;
     const [selectedDate, setSelectedDate] = useState<string>(date);
     const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false);
     const [datePickerDate, setDatePickerDate] = useState<Date | null>(moment(date, 'YYYY-MM-DD').toDate());
+    const [startDate, setStartDate] = useState<string | null>(start_date || null);
+    const [endDate, setEndDate] = useState<string | null>(end_date || null);
+    const [startDatePicker, setStartDatePicker] = useState<Date | null>(start_date ? moment(start_date, 'YYYY-MM-DD').toDate() : null);
+    const [endDatePicker, setEndDatePicker] = useState<Date | null>(end_date ? moment(end_date, 'YYYY-MM-DD').toDate() : null);
 
     useEffect(() => {
         setSelectedDate(date);
         setDatePickerDate(moment(date, 'YYYY-MM-DD').toDate());
-    }, [date]);
+        setStartDate(start_date || null);
+        setEndDate(end_date || null);
+        setStartDatePicker(start_date ? moment(start_date, 'YYYY-MM-DD').toDate() : null);
+        setEndDatePicker(end_date ? moment(end_date, 'YYYY-MM-DD').toDate() : null);
+    }, [date, start_date, end_date]);
 
     useEffect(() => {
         if (flash?.message || flash?.success) {
@@ -69,8 +72,15 @@ export default function FinanceList({ finances, workers, total_amount, date }: P
         return current.format('YYYY-MM-DD');
     };
 
-    const goToDate = (nextDate: string) => {
-        router.get('/finance/list', { date: nextDate }, { preserveState: true, preserveScroll: true });
+    const goToDate = (nextDate: string, start?: string, end?: string) => {
+        const params: any = {};
+        if (start && end) {
+            params.start_date = start;
+            params.end_date = end;
+        } else {
+            params.date = nextDate;
+        }
+        router.get('/finance/list', params, { preserveState: true, preserveScroll: true });
     };
 
     const handleDateChange = (date: Date | null) => {
@@ -79,6 +89,28 @@ export default function FinanceList({ finances, workers, total_amount, date }: P
             setSelectedDate(formattedDate);
             setDatePickerDate(date);
             goToDate(formattedDate);
+        }
+    };
+
+    const handleRangeChange = () => {
+        if (startDate && endDate) {
+            goToDate('', startDate, endDate);
+        }
+    };
+
+    const handleStartDateChange = (date: Date | null) => {
+        if (date) {
+            const formatted = moment(date).format('YYYY-MM-DD');
+            setStartDate(formatted);
+            setStartDatePicker(date);
+        }
+    };
+
+    const handleEndDateChange = (date: Date | null) => {
+        if (date) {
+            const formatted = moment(date).format('YYYY-MM-DD');
+            setEndDate(formatted);
+            setEndDatePicker(date);
         }
     };
 
@@ -147,61 +179,139 @@ export default function FinanceList({ finances, workers, total_amount, date }: P
 
                     {/* Date Filter */}
                     <div className="mb-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <button
-                                    type="button"
-                                    onClick={() => goToDate(shiftDate(-1))}
-                                    className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-700 shadow-md transition hover:bg-gray-200"
-                                >
-                                    روز قبل
-                                </button>
+                        <div className="mb-4">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">فیلتر تاریخ</h3>
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => goToDate(shiftDate(-1))}
+                                        className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-700 shadow-md transition hover:bg-gray-200"
+                                    >
+                                        روز قبل
+                                    </button>
 
-                                <div className="relative w-48">
-                                    <DatePicker
-                                        selected={datePickerDate}
-                                        onChange={handleDateChange}
-                                        dateFormat="yyyy/MM/dd"
-                                        locale={locale}
-                                        customInput={<CustomInput />}
-                                        showPopperArrow={false}
-                                        popperPlacement="bottom"
-                                        renderCustomHeader={({
-                                            date,
-                                            decreaseMonth,
-                                            increaseMonth,
-                                            prevMonthButtonDisabled,
-                                            nextMonthButtonDisabled,
-                                        }) => (
-                                            <div className="flex items-center justify-between px-4 py-2">
-                                                <button type="button" onClick={decreaseMonth} disabled={prevMonthButtonDisabled} className="p-1">
-                                                    ‹
-                                                </button>
-                                                <span className="text-lg font-semibold">{moment(date).locale('fa').format('jMMMM jYYYY')}</span>
-                                                <button type="button" onClick={increaseMonth} disabled={nextMonthButtonDisabled} className="p-1">
-                                                    ›
-                                                </button>
-                                            </div>
-                                        )}
-                                    />
+                                    <div className="relative w-48">
+                                        <DatePicker
+                                            selected={datePickerDate}
+                                            onChange={handleDateChange}
+                                            dateFormat="yyyy/MM/dd"
+                                            locale={locale}
+                                            customInput={<CustomInput />}
+                                            showPopperArrow={false}
+                                            popperPlacement="bottom"
+                                            renderCustomHeader={({
+                                                date,
+                                                decreaseMonth,
+                                                increaseMonth,
+                                                prevMonthButtonDisabled,
+                                                nextMonthButtonDisabled,
+                                            }) => (
+                                                <div className="flex items-center justify-between px-4 py-2">
+                                                    <button type="button" onClick={decreaseMonth} disabled={prevMonthButtonDisabled} className="p-1">
+                                                        ‹
+                                                    </button>
+                                                    <span className="text-lg font-semibold">{moment(date).locale('fa').format('jMMMM jYYYY')}</span>
+                                                    <button type="button" onClick={increaseMonth} disabled={nextMonthButtonDisabled} className="p-1">
+                                                        ›
+                                                    </button>
+                                                </div>
+                                            )}
+                                        />
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => goToDate(shiftDate(1))}
+                                        className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-700 shadow-md transition hover:bg-gray-200"
+                                    >
+                                        روز بعد
+                                    </button>
                                 </div>
 
                                 <button
                                     type="button"
-                                    onClick={() => goToDate(shiftDate(1))}
-                                    className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-700 shadow-md transition hover:bg-gray-200"
+                                    onClick={() => goToDate(moment().format('YYYY-MM-DD'))}
+                                    className="rounded-lg bg-blue-100 px-4 py-2 text-sm text-blue-700 shadow-md transition hover:bg-blue-200"
                                 >
-                                    روز بعد
+                                    امروز
                                 </button>
                             </div>
+                        </div>
 
-                            <button
-                                type="button"
-                                onClick={() => goToDate(moment().format('YYYY-MM-DD'))}
-                                className="rounded-lg bg-blue-100 px-4 py-2 text-sm text-blue-700 shadow-md transition hover:bg-blue-200"
-                            >
-                                امروز
-                            </button>
+                        <div className="border-t border-gray-200 pt-4">
+                            <h4 className="text-md font-medium text-gray-700 mb-2">بازه زمانی</h4>
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-2">
+                                    <label className="text-sm text-gray-600">از:</label>
+                                    <div className="relative w-32">
+                                        <DatePicker
+                                            selected={startDatePicker}
+                                            onChange={handleStartDateChange}
+                                            dateFormat="yyyy/MM/dd"
+                                            locale={locale}
+                                            customInput={<CustomInput />}
+                                            showPopperArrow={false}
+                                            popperPlacement="bottom"
+                                            renderCustomHeader={({
+                                                date,
+                                                decreaseMonth,
+                                                increaseMonth,
+                                                prevMonthButtonDisabled,
+                                                nextMonthButtonDisabled,
+                                            }) => (
+                                                <div className="flex items-center justify-between px-4 py-2">
+                                                    <button type="button" onClick={decreaseMonth} disabled={prevMonthButtonDisabled} className="p-1">
+                                                        ‹
+                                                    </button>
+                                                    <span className="text-lg font-semibold">{moment(date).locale('fa').format('jMMMM jYYYY')}</span>
+                                                    <button type="button" onClick={increaseMonth} disabled={nextMonthButtonDisabled} className="p-1">
+                                                        ›
+                                                    </button>
+                                                </div>
+                                            )}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <label className="text-sm text-gray-600">تا:</label>
+                                    <div className="relative w-32">
+                                        <DatePicker
+                                            selected={endDatePicker}
+                                            onChange={handleEndDateChange}
+                                            dateFormat="yyyy/MM/dd"
+                                            locale={locale}
+                                            customInput={<CustomInput />}
+                                            showPopperArrow={false}
+                                            popperPlacement="bottom"
+                                            renderCustomHeader={({
+                                                date,
+                                                decreaseMonth,
+                                                increaseMonth,
+                                                prevMonthButtonDisabled,
+                                                nextMonthButtonDisabled,
+                                            }) => (
+                                                <div className="flex items-center justify-between px-4 py-2">
+                                                    <button type="button" onClick={decreaseMonth} disabled={prevMonthButtonDisabled} className="p-1">
+                                                        ‹
+                                                    </button>
+                                                    <span className="text-lg font-semibold">{moment(date).locale('fa').format('jMMMM jYYYY')}</span>
+                                                    <button type="button" onClick={increaseMonth} disabled={nextMonthButtonDisabled} className="p-1">
+                                                        ›
+                                                    </button>
+                                                </div>
+                                            )}
+                                        />
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleRangeChange}
+                                    className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-md transition hover:bg-green-700"
+                                >
+                                    اعمال فیلتر
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -211,7 +321,7 @@ export default function FinanceList({ finances, workers, total_amount, date }: P
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="mb-1 text-sm text-gray-500">تعداد عملیات</p>
-                                    <h3 className="text-2xl font-bold text-gray-800">{finances.total} عملیات</h3>
+                                    <h3 className="text-2xl font-bold text-gray-800">{finances.length} عملیات</h3>
                                 </div>
                                 <div className="rounded-lg bg-blue-100 p-3 text-blue-500">
                                     <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
@@ -254,7 +364,10 @@ export default function FinanceList({ finances, workers, total_amount, date }: P
                     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
                         <div className="border-b border-gray-200 px-6 py-4">
                             <div className="flex items-center justify-between">
-                                <h2 className="text-xl font-bold text-gray-800">عملیات‌های مالی - {formatJalaliDate(selectedDate)}</h2>
+                                <h2 className="text-xl font-bold text-gray-800">
+                                    عملیات‌های مالی
+                                    {startDate && endDate ? ` - از ${formatJalaliDate(startDate)} تا ${formatJalaliDate(endDate)}` : ` - ${formatJalaliDate(selectedDate)}`}
+                                </h2>
                                 <a
                                     href="/finance"
                                     className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-md transition hover:bg-blue-700"
@@ -276,7 +389,7 @@ export default function FinanceList({ finances, workers, total_amount, date }: P
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {finances.data.length === 0 ? (
+                                    {finances.length === 0 ? (
                                         <tr>
                                             <td colSpan={5} className="py-8 text-center">
                                                 <div className="flex flex-col items-center justify-center">
@@ -294,15 +407,17 @@ export default function FinanceList({ finances, workers, total_amount, date }: P
                                                         />
                                                     </svg>
                                                     <h3 className="mb-1 text-lg font-medium text-gray-500">هیچ عملیات مالی ثبت نشده است</h3>
-                                                    <p className="text-sm text-gray-400">برای تاریخ {formatJalaliDate(selectedDate)} عملیاتی یافت نشد.</p>
+                                                    <p className="text-sm text-gray-400">
+                                                        {startDate && endDate ? `برای بازه ${formatJalaliDate(startDate)} تا ${formatJalaliDate(endDate)} عملیاتی یافت نشد.` : `برای تاریخ ${formatJalaliDate(selectedDate)} عملیاتی یافت نشد.`}
+                                                    </p>
                                                 </div>
                                             </td>
                                         </tr>
                                     ) : (
-                                        finances.data.map((finance, index) => (
+                                        finances.map((finance, index) => (
                                             <tr key={finance.id} className="border-b border-gray-200 hover:bg-gray-50">
                                                 <td className="px-4 py-3 text-right text-gray-600">
-                                                    {(finances.current_page - 1) * finances.per_page + index + 1}
+                                                    {index + 1}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <div className="font-medium text-gray-800">{finance.worker.name}</div>
@@ -327,49 +442,17 @@ export default function FinanceList({ finances, workers, total_amount, date }: P
                             </table>
                         </div>
 
-                        {finances.data.length > 0 && (
+                        {finances.length > 0 && (
                             <>
                                 {/* جمع‌بندی */}
                                 <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
-                                    <div className="flex items-center justify-between">
                                         <div className="font-medium text-gray-700">
                                             <span className="ml-2">جمع کل:</span>
                                             <span className={`text-lg font-bold ${total_amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                 {formatPrice(Math.abs(total_amount))}
                                             </span>
                                         </div>
-                                        <div className="text-sm text-gray-500">
-                                            صفحه {finances.current_page} از {finances.last_page}
-                                        </div>
-                                    </div>
                                 </div>
-
-                                {/* Pagination */}
-                                {finances.last_page > 1 && (
-                                    <div className="border-t border-gray-200 px-6 py-4">
-                                        <div className="flex items-center justify-center gap-1">
-                                            {finances.links.map((link: any, index: number) => (
-                                                <button
-                                                    key={index}
-                                                    onClick={() => {
-                                                        if (link.url) {
-                                                            router.get(link.url, { date: selectedDate }, { preserveState: true });
-                                                        }
-                                                    }}
-                                                    disabled={!link.url || link.active}
-                                                    className={`rounded-lg px-3 py-1 text-sm font-medium transition ${
-                                                        link.active
-                                                            ? 'bg-blue-600 text-white'
-                                                            : link.url
-                                                            ? 'bg-white text-gray-700 hover:bg-gray-100'
-                                                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                    }`}
-                                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
                             </>
                         )}
                     </div>

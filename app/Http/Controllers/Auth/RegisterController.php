@@ -12,13 +12,11 @@ use Inertia\Response;
 
 class RegisterController extends Controller
 {
-    // نمایش فرم ثبت‌نام
     public function showRegistrationForm(): Response
     {
         return Inertia::render('Auth/Register');
     }
 
-    // پردازش ثبت‌نام
     public function register(Request $request)
     {
         $request->validate([
@@ -30,17 +28,14 @@ class RegisterController extends Controller
             'phone.unique' => 'این شماره تلفن قبلاً ثبت شده است.',
         ]);
 
-        // ایجاد کاربر جدید
         $user = User::create([
             'name' => $request->name,
             'phone' => $request->phone,
             'password' => Hash::make($request->password),
         ]);
 
-        // لاگین کردن کاربر بعد از ثبت‌نام
         auth()->login($user);
 
-        // ریدایرکت به صفحه اصلی
         return redirect()->route('attendance.view')
             ->with('success', 'ثبت‌نام با موفقیت انجام شد و وارد سیستم شدید!');
     }
