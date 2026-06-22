@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Finance;
+use App\Models\SalaryRequest;
 use App\Models\Worker;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -14,10 +15,28 @@ class FinanceController extends Controller
 {
     public function index()
     {
-        $workers = Worker::orderBy('name')->get(['id', 'name']);
+        $workers = Worker::orderBy('name')->get(['id', 'name', 'weekly_salary_limit', 'monthly_salary_limit']);
+
+        $now = Carbon::now();
+        $weekPeriod = $now->format('Y') . '-W' . $now->format('W');
+        $monthPeriod = $now->format('Y-m');
+
+        $weeklyRequests = SalaryRequest::with('worker')
+            ->where('type', 'weekly')
+            ->where('period', $weekPeriod)
+            ->get();
+
+        $monthlyRequests = SalaryRequest::with('worker')
+            ->where('type', 'monthly')
+            ->where('period', $monthPeriod)
+            ->get();
 
         return Inertia::render('Finance/Index', [
             'workers' => $workers,
+            'weeklyRequests' => $weeklyRequests,
+            'monthlyRequests' => $monthlyRequests,
+            'weekPeriod' => $weekPeriod,
+            'monthPeriod' => $monthPeriod,
         ]);
     }
 
@@ -75,5 +94,58 @@ class FinanceController extends Controller
         ]);
 
         return back()->with('success', 'عملیات مالی با موفقیت ثبت شد.');
+    }
+
+    public function salaryRequest(Request $request)
+    {
+        $validated = $request->validate([
+            'worker_id' => 'required|exists:workers,id',
+            'type'      => 'required|in:weekly,monthly',
+            'period'    => 'required|string',
+            'note'      => 'nullable|string|max:500',
+            'amount'    => 'required|integer|min:1',
+            'password'  => 'required|string',
+        ]);
+
+        $worker = Worker::find($validated['worker_id']);
+        if (!$worker || !Hash::check($validated['password'], $worker->password)) {
+            throw ValidationException::withMessages(['password' => ['رمز عبور اشتباه است.']]);
+        }
+
+        $limitField = $validated['type'] === 'weekly' ? 'weekly_salary_limit' : 'monthly_salary_limit';
+        if ($worker->$limitField && $validated['amount'] > $worker->$limitField) {
+            throw ValidationException::withMessages(['amount' => ['مبلغ درخواستی از سقف مجاز بیشتر است.']]);
+        }
+
+        $exists = SalaryRequest::where('worker_id', $validated['worker_id'])
+            ->where('type', $validated['type'])
+            ->where('period', $validated['period'])
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages(['general' => ['شما قبلاً برای این دوره درخواست ارسال کرده‌اید.']]);
+        }
+
+        SalaryRequest::create([
+            'worker_id' => $validated['worker_id'],
+            'type'      => $validated['type'],
+            'period'    => $validated['period'],
+            'note'      => $validated['note'] ?? null,
+            'amount'    => $validated['amount'],
+            'status'    => 'pending',
+        ]);
+
+        return back()->with('success', 'درخواست حقوق با موفقیت ارسال شد.');
+    }
+
+    public function updateSalaryRequestStatus(Request $request, SalaryRequest $salaryRequest)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:approved,rejected',
+        ]);
+
+        $salaryRequest->update(['status' => $validated['status']]);
+
+        return back()->with('success', 'وضعیت درخواست بروزرسانی شد.');
     }
 }

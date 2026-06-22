@@ -1,8 +1,10 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import moment from 'jalali-moment';
-import React, { useEffect, useState } from 'react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
+import { useEffect, useState } from 'react';
+import gregorian from 'react-date-object/calendars/gregorian';
+import persian from 'react-date-object/calendars/persian';
+import persian_fa from 'react-date-object/locales/persian_fa';
+import DatePicker, { DateObject } from 'react-multi-date-picker';
 
 type AttendanceRow = {
     id: number;
@@ -44,101 +46,72 @@ type PageProps = {
     flash?: FlashBag;
 };
 
+const toDateObject = (gregorianStr: string) =>
+    new DateObject({ date: gregorianStr, calendar: gregorian }).convert(persian);
+
 export default function AttendanceList({ attendances, date, totals }: PageProps) {
     const { flash } = usePage().props as { flash?: FlashBag };
-    const [selectedDate, setSelectedDate] = useState<string>(date);
     const [showSuccessMessage, setShowSuccessMessage] = useState<boolean>(false);
-    const [datePickerDate, setDatePickerDate] = useState<Date | null>(moment(date, 'YYYY-MM-DD').toDate());
+    const [datePickerDate, setDatePickerDate] = useState<DateObject | null>(toDateObject(date));
 
     useEffect(() => {
-        setSelectedDate(date);
-        setDatePickerDate(moment(date, 'YYYY-MM-DD').toDate());
+        setDatePickerDate(toDateObject(date));
     }, [date]);
 
     useEffect(() => {
         if (flash?.message || flash?.success) {
             setShowSuccessMessage(true);
-            const timer = setTimeout(() => {
-                setShowSuccessMessage(false);
-            }, 5000);
+            const timer = setTimeout(() => setShowSuccessMessage(false), 5000);
             return () => clearTimeout(timer);
         }
     }, [flash]);
 
     const formatTime = (value?: string | null) => {
         if (!value) return '--:--';
-        const dt = new Date(value);
-        return dt.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+        return new Date(value).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
     };
 
     const shiftDate = (offset: number) => {
-        const current = moment(date, 'YYYY-MM-DD');
-        current.add(offset, 'days');
-        return current.format('YYYY-MM-DD');
+        return moment(date, 'YYYY-MM-DD').add(offset, 'days').format('YYYY-MM-DD');
     };
 
-    const goToDate = (nextDate: string) => {
-        router.get('/attendance-list', { date: nextDate }, { preserveState: true, preserveScroll: true });
+    const goToDate = (gregorianDate: string) => {
+        router.get('/attendance-list', { date: gregorianDate }, { preserveState: true, preserveScroll: true });
     };
 
-    const handleDateChange = (date: Date | null) => {
-        if (date) {
-            const formattedDate = moment(date).format('YYYY-MM-DD');
-            setSelectedDate(formattedDate);
-            setDatePickerDate(date);
-            goToDate(formattedDate);
+    const handleDateChange = (dateObj: DateObject | null) => {
+        if (dateObj) {
+            const gregorianDate = dateObj.convert(gregorian).format('YYYY-MM-DD');
+            setDatePickerDate(dateObj);
+            goToDate(gregorianDate);
         }
     };
 
-    const formatJalaliDate = (dateString: string) => {
-        return moment(dateString, 'YYYY-MM-DD').locale('fa').format('jYYYY/jMM/jDD');
-    };
+    const jalaliDateLabel = moment(date, 'YYYY-MM-DD').locale('fa').format('dddd jD jMMMM jYYYY');
 
-    // کاستوم‌سازی نمایش تاریخ شمسی در datepicker
-    const locale = {
-        localize: {
-            day: (n: number) => moment.localeData('fa').weekdays()[n],
-            month: (n: number) => moment.localeData('fa').months()[n],
-        },
-        formatLong: {
-            date: () => 'yyyy/MM/dd',
-        },
-    };
-
-    // کامپوننت سفارشی برای نمایش تاریخ در input
-    const CustomInput = React.forwardRef(({ value, onClick }: any, ref: any) => (
-        <button
-            type="button"
-            className="w-full rounded-lg border-2 border-gray-200 px-4 py-2 text-right text-gray-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-            onClick={onClick}
-            ref={ref}
-        >
-            {value ? moment(value, 'YYYY-MM-DD').locale('fa').format('jYYYY/jMM/jDD') : 'انتخاب تاریخ'}
-        </button>
-    ));
+    const inputClass =
+        'w-full rounded-xl border border-slate-700 bg-slate-800/80 px-4 py-2.5 text-right text-sm text-slate-200 transition-all duration-200 hover:border-teal-500/50 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 cursor-pointer';
 
     return (
         <>
             <Head title="لیست حضور و غیاب" />
 
-            <div className="min-h-screen bg-gray-100">
-                <div className="mx-auto max-w-7xl p-4">
+            <div className="min-h-screen" style={{ background: '#050a12' }}>
+                <div className="mx-auto max-w-7xl p-4 md:p-6">
+
                     {/* Header */}
                     <div className="mb-8">
-                        <h1 className="mb-2 text-3xl font-black text-gray-900">لیست حضور و غیاب</h1>
-                        <p className="text-gray-600">گزارش روزانه حضور کارکنان</p>
+                        <p className="text-xs text-teal-400/70 mb-1">الف شاپ</p>
+                        <h1 className="text-3xl font-black text-white">لیست حضور و غیاب</h1>
+                        <p className="text-sm text-slate-400 mt-1">گزارش روزانه حضور کارکنان</p>
                     </div>
 
-                    {/* Success Message */}
+                    {/* Flash */}
                     {showSuccessMessage && (flash?.message || flash?.success) && (
-                        <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-green-700 transition-opacity duration-500">
-                            <div className="flex items-center">
-                                <svg className="mr-2 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path
-                                        fillRule="evenodd"
-                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                        clipRule="evenodd"
-                                    />
+                        <div className="mb-6 animate-fadeIn rounded-xl border border-teal-500/30 bg-teal-500/10 p-4 text-teal-300">
+                            <div className="flex items-center gap-2">
+                                <svg className="h-5 w-5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                 </svg>
                                 {flash?.message || flash?.success}
                             </div>
@@ -146,213 +119,141 @@ export default function AttendanceList({ attendances, date, totals }: PageProps)
                     )}
 
                     {/* Date Filter */}
-                    <div className="mb-8 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
+                    <div className="mb-8 rounded-2xl border border-slate-700/50 bg-slate-900/80 p-5 shadow-[0_8px_40px_rgba(0,0,0,0.4)] backdrop-blur-sm" style={{ position: 'relative', zIndex: 100 }}>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
                                 <button
                                     type="button"
                                     onClick={() => goToDate(shiftDate(-1))}
-                                    className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-700 shadow-md transition hover:bg-gray-200"
+                                    className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-slate-300 transition-all duration-200 hover:border-teal-500/50 hover:text-teal-400"
                                 >
                                     روز قبل
                                 </button>
 
-                                <div className="relative">
+                                <div className="w-44">
                                     <DatePicker
-                                        selected={datePickerDate}
+                                        value={datePickerDate}
                                         onChange={handleDateChange}
-                                        dateFormat="yyyy/MM/dd"
-                                        locale={locale}
-                                        customInput={<CustomInput />}
-                                        showPopperArrow={false}
-                                        popperPlacement="bottom"
-                                        renderCustomHeader={({
-                                            date,
-                                            decreaseMonth,
-                                            increaseMonth,
-                                            prevMonthButtonDisabled,
-                                            nextMonthButtonDisabled,
-                                        }) => (
-                                            <div className="flex items-center justify-between px-4 py-2">
-                                                <button type="button" onClick={decreaseMonth} disabled={prevMonthButtonDisabled} className="p-1">
-                                                    ‹
-                                                </button>
-                                                <span className="text-lg font-semibold">{moment(date).locale('fa').format('jMMMM jYYYY')}</span>
-                                                <button type="button" onClick={increaseMonth} disabled={nextMonthButtonDisabled} className="p-1">
-                                                    ›
-                                                </button>
-                                            </div>
-                                        )}
+                                        locale={persian_fa}
+                                        calendar={persian}
+                                        format="YYYY/MM/DD"
+                                        inputClass={inputClass}
+                                        containerClassName="w-full"
                                     />
                                 </div>
 
                                 <button
                                     type="button"
                                     onClick={() => goToDate(shiftDate(1))}
-                                    className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-700 shadow-md transition hover:bg-gray-200"
+                                    className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-slate-300 transition-all duration-200 hover:border-teal-500/50 hover:text-teal-400"
                                 >
                                     روز بعد
                                 </button>
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={() => goToDate(moment().format('YYYY-MM-DD'))}
-                                className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-700 shadow-md transition hover:bg-gray-200"
-                            >
-                                امروز
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm text-slate-400">{jalaliDateLabel}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => goToDate(moment().format('YYYY-MM-DD'))}
+                                    className="rounded-xl border border-teal-500/30 bg-teal-500/10 px-4 py-2.5 text-sm font-medium text-teal-400 transition-all duration-200 hover:bg-teal-500/20"
+                                >
+                                    امروز
+                                </button>
+                            </div>
                         </div>
                     </div>
 
                     {/* Stats */}
-                    <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="mb-1 text-sm text-gray-500">کل کارکنان</p>
-                                    <h3 className="text-2xl font-bold text-gray-800">{totals.total} نفر</h3>
-                                </div>
-                                <div className="rounded-lg bg-blue-100 p-3 text-blue-500">
-                                    <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
-                                    </svg>
-                                </div>
+                    <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3" style={{ position: 'relative', zIndex: 1 }}>
+                        {[
+                            { label: 'کل کارکنان', value: totals.total, color: 'blue' },
+                            { label: 'حاضرین', value: totals.present, color: 'teal' },
+                            { label: 'غایبین', value: totals.absent, color: 'rose' },
+                        ].map(({ label, value, color }) => (
+                            <div key={label} className={`rounded-2xl border border-${color}-500/20 bg-${color}-500/5 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.3)]`}>
+                                <p className="mb-1 text-sm text-slate-400">{label}</p>
+                                <h3 className={`text-3xl font-black text-${color}-400`}>{value}</h3>
+                                <p className="text-xs text-slate-500 mt-1">نفر</p>
                             </div>
-                        </div>
-
-                        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="mb-1 text-sm text-gray-500">حاضرین</p>
-                                    <h3 className="text-2xl font-bold text-gray-800">{totals.present} نفر</h3>
-                                </div>
-                                <div className="rounded-lg bg-green-100 p-3 text-green-500">
-                                    <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
-                                        <path
-                                            fillRule="evenodd"
-                                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                            clipRule="evenodd"
-                                        />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="mb-1 text-sm text-gray-500">غایبین</p>
-                                    <h3 className="text-2xl font-bold text-gray-800">{totals.absent} نفر</h3>
-                                </div>
-                                <div className="rounded-lg bg-red-100 p-3 text-red-500">
-                                    <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
-                                        <path
-                                            fillRule="evenodd"
-                                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                                            clipRule="evenodd"
-                                        />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
+                        ))}
                     </div>
 
-                    {/* Attendance Table */}
-                    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-                        <div className="border-b border-gray-200 px-6 py-4">
-                            <h2 className="text-xl font-bold text-gray-800">کارکنان</h2>
+                    {/* Table */}
+                    <div className="overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-900/80 shadow-[0_8px_40px_rgba(0,0,0,0.4)] backdrop-blur-sm" style={{ position: 'relative', zIndex: 1 }}>
+                        <div className="border-b border-slate-700/50 px-6 py-4 flex items-center justify-between">
+                            <h2 className="text-lg font-bold text-white">کارکنان</h2>
+                            <span className="rounded-full border border-slate-600/50 bg-slate-800/80 px-3 py-1 text-xs text-slate-400">
+                                {attendances.length} رکورد
+                            </span>
                         </div>
 
                         <div className="overflow-x-auto">
                             <table className="w-full border-collapse">
                                 <thead>
-                                    <tr className="bg-gray-50">
-                                        <th className="border-b border-gray-200 px-4 py-3 text-right font-semibold text-gray-700">نام</th>
-                                        <th className="border-b border-gray-200 px-4 py-3 text-center font-semibold text-gray-700">ورود</th>
-                                        <th className="border-b border-gray-200 px-4 py-3 text-center font-semibold text-gray-700">خروج</th>
-                                        <th className="border-b border-gray-200 px-4 py-3 text-center font-semibold text-gray-700">ساعات امروز</th>
-                                        <th className="border-b border-gray-200 px-4 py-3 text-center font-semibold text-gray-700">ساعات هفتگی</th>
-                                        <th className="border-b border-gray-200 px-4 py-3 text-center font-semibold text-gray-700">ساعات ماهانه</th>
-                                        <th className="border-b border-gray-200 px-4 py-3 text-center font-semibold text-gray-700">وضعیت</th>
+                                    <tr className="bg-slate-800/50">
+                                        {['نام', 'ورود', 'خروج', 'ساعات امروز', 'ساعات هفتگی', 'ساعات ماهانه', 'وضعیت'].map((h, i) => (
+                                            <th key={h} className={`border-b border-slate-700/50 px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider ${i === 0 ? 'text-right' : 'text-center'}`}>
+                                                {h}
+                                            </th>
+                                        ))}
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {attendances.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} className="py-8 text-center">
+                                            <td colSpan={7} className="py-16 text-center">
                                                 <div className="flex flex-col items-center justify-center">
-                                                    <svg
-                                                        className="mb-2 h-12 w-12 text-gray-400"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        viewBox="0 0 24 24"
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth="2"
-                                                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                                                        />
-                                                    </svg>
-                                                    <h3 className="mb-1 text-lg font-medium text-gray-500">رکوردی یافت نشد</h3>
-                                                    <p className="text-sm text-gray-400">هیچ اطلاعات حضور و غیابی برای این تاریخ ثبت نشده است.</p>
+                                                    <div className="mb-4 rounded-2xl border border-slate-700/50 bg-slate-800/50 p-6">
+                                                        <svg className="h-12 w-12 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                                        </svg>
+                                                    </div>
+                                                    <p className="text-slate-400 font-medium">رکوردی یافت نشد</p>
+                                                    <p className="text-sm text-slate-600 mt-1">هیچ اطلاعاتی برای {jalaliDateLabel} ثبت نشده است</p>
                                                 </div>
                                             </td>
                                         </tr>
                                     ) : (
                                         attendances.map((attendance) => {
-                                            let status = 'غایب';
-                                            let statusClass = 'bg-gray-100 text-gray-800';
-
+                                            let statusLabel = 'غایب';
+                                            let statusClass = 'border-slate-600/50 bg-slate-800/50 text-slate-500';
                                             if (attendance.status === 'present') {
-                                                status = 'حاضر';
-                                                statusClass = 'bg-green-100 text-green-800';
+                                                statusLabel = 'حاضر';
+                                                statusClass = 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400';
                                             } else if (attendance.status === 'working') {
-                                                status = 'در محل کار';
-                                                statusClass = 'bg-yellow-100 text-yellow-800';
+                                                statusLabel = 'در محل کار';
+                                                statusClass = 'border-teal-500/30 bg-teal-500/10 text-teal-400';
                                             }
 
                                             return (
-                                                <tr key={attendance.id} className="border-b border-gray-200 hover:bg-gray-50">
-                                                    <td className="px-4 py-3 text-right">
-                                                        <div className="font-medium text-gray-800">{attendance.worker.name ?? 'نامشخص'}</div>
-                                                        <div className="text-sm text-gray-500">{attendance.worker.code ?? ''}</div>
+                                                <tr key={attendance.id} className="border-b border-slate-700/30 transition-colors hover:bg-teal-500/5">
+                                                    <td className="px-4 py-3.5 text-right">
+                                                        <div className="font-medium text-slate-100">{attendance.worker.name ?? 'نامشخص'}</div>
+                                                        {attendance.worker.code && <div className="text-xs text-slate-500 mt-0.5">{attendance.worker.code}</div>}
                                                     </td>
-
-                                                    <td className="px-4 py-3 text-center">
-                                                        {attendance.check_in ? (
-                                                            <>
-                                                                <span className="font-medium text-gray-800">{formatTime(attendance.check_in)}</span>
-                                                            </>
-                                                        ) : (
-                                                            <span className="text-gray-400">--:--</span>
-                                                        )}
+                                                    <td className="px-4 py-3.5 text-center">
+                                                        <span className={`font-medium ${attendance.check_in ? 'text-emerald-400' : 'text-slate-600'}`}>
+                                                            {formatTime(attendance.check_in)}
+                                                        </span>
                                                     </td>
-
-                                                    <td className="px-4 py-3 text-center">
-                                                        {attendance.check_out ? (
-                                                            <span className="font-medium text-gray-800">{formatTime(attendance.check_out)}</span>
-                                                        ) : (
-                                                            <span className="text-gray-400">--:--</span>
-                                                        )}
+                                                    <td className="px-4 py-3.5 text-center">
+                                                        <span className={`font-medium ${attendance.check_out ? 'text-rose-400' : 'text-slate-600'}`}>
+                                                            {formatTime(attendance.check_out)}
+                                                        </span>
                                                     </td>
-
-                                                    <td className="px-4 py-3 text-center">
-                                                        <span className="font-medium text-blue-700">{attendance.work_hours}</span>
+                                                    <td className="px-4 py-3.5 text-center">
+                                                        <span className="font-medium text-blue-400">{attendance.work_hours}</span>
                                                     </td>
-
-                                                    <td className="px-4 py-3 text-center">
-                                                        <span className="font-medium text-purple-700">{attendance.weekly_hours}</span>
+                                                    <td className="px-4 py-3.5 text-center">
+                                                        <span className="font-medium text-purple-400">{attendance.weekly_hours}</span>
                                                     </td>
-
-                                                    <td className="px-4 py-3 text-center">
-                                                        <span className="font-medium text-amber-700">{attendance.monthly_hours}</span>
+                                                    <td className="px-4 py-3.5 text-center">
+                                                        <span className="font-medium text-amber-400">{attendance.monthly_hours}</span>
                                                     </td>
-
-                                                    <td className="px-4 py-3 text-center">
-                                                        <span className={`inline-block rounded-full px-3 py-1 text-sm font-medium ${statusClass}`}>
-                                                            {status}
+                                                    <td className="px-4 py-3.5 text-center">
+                                                        <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${statusClass}`}>
+                                                            {statusLabel}
                                                         </span>
                                                     </td>
                                                 </tr>
@@ -364,36 +265,25 @@ export default function AttendanceList({ attendances, date, totals }: PageProps)
                         </div>
 
                         {attendances.length > 0 && (
-                            <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="text-sm text-gray-500">{attendances.length} رکورد</div>
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => window.print()}
-                                            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 shadow-md transition hover:bg-gray-50"
-                                        >
-                                            چاپ گزارش
-                                        </button>
-                                    </div>
-                                </div>
+                            <div className="border-t border-slate-700/50 bg-slate-800/30 px-6 py-4 flex items-center justify-between">
+                                <span className="text-sm text-slate-500">{attendances.length} رکورد — {jalaliDateLabel}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => window.print()}
+                                    className="rounded-xl border border-slate-600 bg-slate-800 px-4 py-2 text-sm text-slate-300 transition-all duration-200 hover:border-teal-500/50 hover:text-teal-400"
+                                >
+                                    چاپ گزارش
+                                </button>
                             </div>
                         )}
                     </div>
 
-                    {/* Navigation Buttons */}
-                    <div className="mt-4 flex items-center justify-between">
-                        <a
-                            href="/admin"
-                            className="inline-flex items-center rounded-lg bg-gray-300 px-6 py-3 text-gray-900 shadow-md transition hover:bg-gray-200"
-                        >
+                    {/* Navigation */}
+                    <div className="mt-6 flex items-center justify-between">
+                        <a href="/admin" className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/80 px-5 py-2.5 text-sm font-medium text-slate-300 transition-all duration-200 hover:border-teal-500/50 hover:text-teal-400">
                             پنل ادمین
                         </a>
-
-                        <a
-                            href="/finance/list"
-                            className="inline-flex items-center rounded-lg bg-gray-300 text-gray-900 hover:bg-gray-200 px-6 py-3  shadow-md transition"
-                        >
+                        <a href="/finance/list" className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/80 px-5 py-2.5 text-sm font-medium text-slate-300 transition-all duration-200 hover:border-teal-500/50 hover:text-teal-400">
                             گزارش امور مالی
                         </a>
                     </div>

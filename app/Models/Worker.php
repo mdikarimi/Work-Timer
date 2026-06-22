@@ -10,6 +10,8 @@ class Worker extends Model
         'name',
         'user_id',
         'password',
+        'weekly_salary_limit',
+        'monthly_salary_limit',
     ];
     
     public function attendances()
@@ -20,6 +22,11 @@ class Worker extends Model
     public function finances()
     {
         return $this->hasMany(Finance::class);
+    }
+
+    public function salaryRequests()
+    {
+        return $this->hasMany(SalaryRequest::class);
     }
 
     public function user()

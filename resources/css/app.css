@@ -12,9 +12,199 @@
 
 body {
     font-family: var(--font-sans);
+    background-color: #050a12;
+    color: #e2e8f0;
 }
 
-/* Local font-face (place files under public/fonts/vazirmatn) */
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #0d1525;
+}
+::-webkit-scrollbar-thumb {
+    background: #14b8a6;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #0d9488;
+}
+
+/* Glow animation */
+@keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 20px rgba(20, 184, 166, 0.2); }
+    50% { box-shadow: 0 0 35px rgba(20, 184, 166, 0.4); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Dark datepicker overrides */
+.react-datepicker {
+    background-color: #0d1525 !important;
+    border: 1px solid #1c2e4a !important;
+    border-radius: 12px !important;
+    font-family: var(--font-sans) !important;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 30px rgba(20,184,166,0.1) !important;
+}
+.react-datepicker__header {
+    background-color: #0a1020 !important;
+    border-bottom: 1px solid #1c2e4a !important;
+    border-radius: 12px 12px 0 0 !important;
+}
+.react-datepicker__current-month,
+.react-datepicker__day-name {
+    color: #5eead4 !important;
+}
+.react-datepicker__day {
+    color: #cbd5e1 !important;
+    border-radius: 8px !important;
+}
+.react-datepicker__day:hover {
+    background-color: #164e4a !important;
+    color: #5eead4 !important;
+}
+.react-datepicker__day--selected {
+    background-color: #14b8a6 !important;
+    color: #fff !important;
+}
+.react-datepicker__day--today {
+    border: 1px solid #14b8a6 !important;
+    background: transparent !important;
+}
+.react-datepicker__navigation-icon::before {
+    border-color: #5eead4 !important;
+}
+.react-datepicker-popper[data-placement^='bottom'] .react-datepicker__triangle::before,
+.react-datepicker-popper[data-placement^='bottom'] .react-datepicker__triangle::after {
+    border-bottom-color: #0d1525 !important;
+}
+
+/* ─── react-multi-date-picker dark theme ─── */
+.rmdp-container {
+    width: 100% !important;
+    position: relative !important;
+    z-index: 9999 !important;
+}
+
+/* popup wrapper */
+.rmdp-wrapper,
+.rmdp-shadow {
+    z-index: 9999 !important;
+    background-color: #0d1525 !important;
+    border: 1px solid #1c2e4a !important;
+    border-radius: 14px !important;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.7), 0 0 30px rgba(20,184,166,0.12) !important;
+    font-family: var(--font-sans) !important;
+}
+
+/* calendar body */
+.rmdp-calendar {
+    background-color: #0d1525 !important;
+    border-radius: 14px !important;
+    padding: 4px !important;
+}
+
+/* header (month/year + arrows) */
+.rmdp-header {
+    background-color: #0a1020 !important;
+    border-radius: 10px 10px 0 0 !important;
+    border-bottom: 1px solid #1c2e4a !important;
+    padding: 8px 4px !important;
+}
+.rmdp-header-values,
+.rmdp-header-values span,
+.rmdp-header-values button {
+    color: #5eead4 !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    background: transparent !important;
+}
+
+/* weekday row (شن، یک، دو ...) */
+.rmdp-week-day {
+    color: #5eead4 !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    opacity: 0.85;
+}
+
+/* individual day cells */
+.rmdp-day {
+    color: #cbd5e1 !important;
+}
+.rmdp-day span {
+    color: #cbd5e1 !important;
+    border-radius: 8px !important;
+    font-size: 13px !important;
+}
+
+/* hover */
+.rmdp-day:not(.rmdp-disabled):not(.rmdp-day-hidden) span:hover {
+    background-color: #164e4a !important;
+    color: #5eead4 !important;
+}
+
+/* today */
+.rmdp-day.rmdp-today span {
+    background-color: transparent !important;
+    color: #14b8a6 !important;
+    border: 1.5px solid #14b8a6 !important;
+    font-weight: 700 !important;
+}
+
+/* selected */
+.rmdp-day.rmdp-selected span {
+    background-color: #14b8a6 !important;
+    color: #fff !important;
+    box-shadow: 0 0 12px rgba(20,184,166,0.45) !important;
+    font-weight: 700 !important;
+}
+
+/* days from other months */
+.rmdp-day.rmdp-deactive span {
+    color: #334155 !important;
+}
+
+/* disabled */
+.rmdp-day.rmdp-disabled span {
+    color: #1e293b !important;
+    cursor: not-allowed !important;
+}
+
+/* navigation arrows */
+.rmdp-arrow-container {
+    background-color: transparent !important;
+    border-radius: 8px !important;
+}
+.rmdp-arrow-container:hover {
+    background-color: #164e4a !important;
+}
+.rmdp-arrow {
+    border-color: #5eead4 !important;
+}
+
+/* week row background */
+.rmdp-week {
+    background-color: transparent !important;
+}
+
+/* input */
+.rmdp-input {
+    background-color: #1e293b !important;
+    border: 1px solid #334155 !important;
+    color: #e2e8f0 !important;
+    border-radius: 10px !important;
+}
+
 @font-face {
     font-family: 'Vazirmatn';
     src: url('/fonts/Vazirmatn-Regular.ttf') format('truetype');

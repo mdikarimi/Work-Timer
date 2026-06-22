@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\SalaryRequest;
 use App\Models\Worker;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -173,6 +174,17 @@ class WorkerController extends Controller
 
         $weekOfMonth = $this->getJalaliWeekOfMonth($jNow);
 
+        $weekPeriod = $now->format('Y') . '-W' . $now->format('W');
+        $monthPeriod = $now->format('Y-m');
+
+        $salaryRequests = SalaryRequest::where('worker_id', $worker->id)
+            ->where(function ($q) use ($weekPeriod, $monthPeriod) {
+                $q->where(fn($q2) => $q2->where('type', 'weekly')->where('period', $weekPeriod))
+                  ->orWhere(fn($q2) => $q2->where('type', 'monthly')->where('period', $monthPeriod));
+            })
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         return Inertia::render('Admin/WorkerReport', [
             'worker' => $worker,
             'date' => $date,
@@ -207,6 +219,7 @@ class WorkerController extends Controller
             ],
             'current_month' => $jNow->format('%B %Y'),
             'current_week' => 'هفته ' . $weekOfMonth . ' ' . $jNow->format('%B'),
+            'salary_requests' => $salaryRequests,
         ]);
     }
 
@@ -214,7 +227,11 @@ class WorkerController extends Controller
     {
         $worker = auth()->user()->workers()->findOrFail($id);
 
-        $request->validate(['name' => 'required|string']);
+        $request->validate([
+            'name' => 'required|string',
+            'weekly_salary_limit' => 'nullable|integer|min:0',
+            'monthly_salary_limit' => 'nullable|integer|min:0',
+        ]);
 
         if ($request->filled('password')) {
             $request->validate(['password' => 'nullable|string|min:4']);
@@ -222,6 +239,8 @@ class WorkerController extends Controller
         }
 
         $worker->name = $request->name;
+        $worker->weekly_salary_limit = $request->weekly_salary_limit ?: null;
+        $worker->monthly_salary_limit = $request->monthly_salary_limit ?: null;
         $worker->save();
 
         return redirect()->back()->with('message', 'اطلاعات نیرو بروز شد');

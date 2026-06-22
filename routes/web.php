@@ -31,6 +31,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('finance/list', [FinanceController::class, 'list'])->name('finance.list');
     Route::post('finance', [FinanceController::class, 'store'])->name('finance.store');
+    Route::post('finance/salary-request', [FinanceController::class, 'salaryRequest'])->name('finance.salary-request');
+    Route::patch('finance/salary-request/{salaryRequest}', [FinanceController::class, 'updateSalaryRequestStatus'])->name('finance.salary-request.status');
 
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 });
